@@ -32,7 +32,7 @@ services:
     environment:
       DATABASE_URL: postgres://runway:runway@postgres:5432/runway
       FEED_BASE_URL: https://itunes.apple.com
-      WORKER_TICK_MS: "30000"
+      WORKER_TICK_MS: "10000"
       WORKER_STALENESS_MS: "900000"
       WORKER_CLAIM_TTL_MS: "300000"
       WORKER_MAX_PAGES: "10"

@@ -9,6 +9,8 @@ interface ReviewListProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
+  /** True while a just-added app is awaiting its first sync (shows a loader, not the empty state). */
+  isAwaitingFirstSync?: boolean;
 }
 
 export function ReviewList({
@@ -18,6 +20,7 @@ export function ReviewList({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  isAwaitingFirstSync = false,
 }: ReviewListProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +57,14 @@ export function ReviewList({
   }
 
   if (!reviews || reviews.length === 0) {
+    if (isAwaitingFirstSync) {
+      return (
+        <div className="review-list-state">
+          <span className="loading-spinner" aria-hidden="true" />
+          Fetching the latest reviews… this can take a few seconds for a newly added app.
+        </div>
+      );
+    }
     return (
       <div className="review-list-state">
         <h3>No reviews found</h3>

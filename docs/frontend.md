@@ -60,7 +60,9 @@ Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`) and the `R
 
 ### `AddAppForm`
 
-Text input + submit button. Calls `useRegisterApp` with the trimmed input value. Clears the input on success. Shows the error message inline on failure. The `pattern="\d+"` attribute provides browser-level hint for numeric-only input.
+Text input + submit button. Calls `useRegisterApp` with the trimmed input value. Clears the input on success and fires `onAdded(appId)`. Shows the error message inline on failure. The `pattern="\d+"` attribute provides browser-level hint for numeric-only input.
+
+On `onAdded`, `App.tsx` selects the new app and marks it `pendingAppId`. While pending, `useReviews` is given `pollUntilData` so it refetches every ~2.5s until the worker's next tick (≤10s) ingests the first reviews, and `ReviewList` shows a "Fetching the latest reviews…" loader instead of the empty state. The wait is cleared when reviews arrive or after a 30s ceiling.
 
 ### `WindowPicker`
 

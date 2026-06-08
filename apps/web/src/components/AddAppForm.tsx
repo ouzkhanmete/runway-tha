@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useRegisterApp } from "../hooks/useRegisterApp";
 
-export function AddAppForm() {
+interface AddAppFormProps {
+  /** Called with the registered app's id after a successful add. */
+  onAdded?: (appId: string) => void;
+}
+
+export function AddAppForm({ onAdded }: AddAppFormProps) {
   const [appId, setAppId] = useState("");
   const { mutate, isPending, error } = useRegisterApp();
 
@@ -17,8 +22,9 @@ export function AddAppForm() {
           mutate(
             { appId: trimmed },
             {
-              onSuccess: () => {
+              onSuccess: (app) => {
                 setAppId("");
+                onAdded?.(app.id);
               },
             },
           );

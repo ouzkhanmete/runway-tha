@@ -40,7 +40,7 @@ GET https://itunes.apple.com/{country}/rss/customerreviews/id={appId}/sortBy=mos
 
 | Var | Default | Meaning |
 |---|---|---|
-| `WORKER_TICK_MS` | `30000` | Gap between scheduler ticks (ms). Lowered to 30 s so a newly-registered app is picked up quickly in the demo. |
+| `WORKER_TICK_MS` | `10000` | Gap between scheduler ticks (ms). Lowered to 10 s so a newly-registered app is picked up quickly in the demo. |
 | `WORKER_STALENESS_MS` | `900000` | Minimum milliseconds since last successful sync before an app is re-queued (the cooldown, default 15 min) |
 | `WORKER_CLAIM_TTL_MS` | `300000` | How long a claim lease is honored before it is treated as stuck (crashed worker) and may be reclaimed (default 5 min) |
 | `WORKER_MAX_PAGES` | `10` | Maximum pages fetched per app per sync |
@@ -48,7 +48,7 @@ GET https://itunes.apple.com/{country}/rss/customerreviews/id={appId}/sortBy=mos
 | `WORKER_MAX_RETRIES` | `3` | Per-page HTTP retry attempts |
 | `FEED_BASE_URL` | `https://itunes.apple.com` | Base URL for the RSS feed |
 
-Note that `WORKER_TICK_MS` (how often we *look* for work) is independent of `WORKER_STALENESS_MS` (how often a given app is actually *re-synced*). A 30 s tick with a 15 min cooldown means new apps are discovered within 30 s, but an already-synced app is not re-fetched until 15 min have passed.
+Note that `WORKER_TICK_MS` (how often we *look* for work) is independent of `WORKER_STALENESS_MS` (how often a given app is actually *re-synced*). A 10 s tick with a 15 min cooldown means new apps are discovered within 10 s, but an already-synced app is not re-fetched until 15 min have passed. The web app pairs this with a poll-until-loaded spinner after you add an app, so its first reviews appear automatically.
 
 ### Tick cycle — no overlap by construction
 

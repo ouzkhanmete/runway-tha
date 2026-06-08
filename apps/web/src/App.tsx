@@ -13,14 +13,21 @@ export function App() {
   // selection survives a refresh and is shareable.
   const [selectedAppId, setSelectedAppId] = useQueryParam("appId");
   const [windowHours, setWindowHours] = useState(48);
+  // An app that was just registered and is awaiting its first worker sync. While set,
+  // we poll its reviews and show a loader instead of the "no reviews" empty state.
+  const [pendingAppId, setPendingAppId] = useState<string | undefined>();
+  const awaitingFirstSync = !!selectedAppId && selectedAppId === pendingAppId;
 
   // If the URL names no app (or one that no longer exists), default to the first
-  // available app — via `replace` so it doesn't create a spurious history entry.
+  // available app — via `replace` so it doesn't create a spurious history entry. A
+  // just-added app counts as valid even before the apps list refetches.
   useEffect(() => {
     if (!apps || apps.length === 0) return;
-    const exists = selectedAppId && apps.some((a) => a.id === selectedAppId);
+    const exists =
+      !!selectedAppId &&
+      (apps.some((a) => a.id === selectedAppId) || selectedAppId === pendingAppId);
     if (!exists) setSelectedAppId(apps[0].id, { replace: true });
-  }, [apps, selectedAppId, setSelectedAppId]);
+  }, [apps, selectedAppId, pendingAppId, setSelectedAppId]);
 
   const {
     data: reviewPages,
@@ -29,8 +36,21 @@ export function App() {
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useReviews(selectedAppId, windowHours);
+  } = useReviews(selectedAppId, windowHours, { pollUntilData: awaitingFirstSync });
   const reviews = reviewPages?.pages.flatMap((page) => page.items);
+
+  // Stop waiting once the first reviews arrive for the pending app.
+  useEffect(() => {
+    if (awaitingFirstSync && reviews && reviews.length > 0) setPendingAppId(undefined);
+  }, [awaitingFirstSync, reviews]);
+
+  // Bound the wait so we don't poll forever for an app that genuinely has no reviews
+  // in the window (the worker tick is ~10s; 30s is a comfortable ceiling).
+  useEffect(() => {
+    if (!pendingAppId) return;
+    const timer = setTimeout(() => setPendingAppId(undefined), 30_000);
+    return () => clearTimeout(timer);
+  }, [pendingAppId]);
 
   return (
     <div>
@@ -40,7 +60,12 @@ export function App() {
       </header>
 
       <div className="controls-bar">
-        <AddAppForm />
+        <AddAppForm
+          onAdded={(id) => {
+            setSelectedAppId(id);
+            setPendingAppId(id);
+          }}
+        />
 
         <div className="control-group">
           <label>App</label>
@@ -64,6 +89,7 @@ export function App() {
         hasNextPage={!!hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={() => fetchNextPage()}
+        isAwaitingFirstSync={awaitingFirstSync}
       />
     </div>
   );
