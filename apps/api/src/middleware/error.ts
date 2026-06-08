@@ -4,11 +4,12 @@ import { ZodError } from "zod";
 
 export function errorHandler(err: unknown, c: Context) {
   if (err instanceof ZodError) {
+    const message = err.issues[0]?.message ?? "Invalid request";
     return c.json(
       {
         error: {
           code: "VALIDATION",
-          message: "Invalid request",
+          message,
           details: err.issues,
         },
       },

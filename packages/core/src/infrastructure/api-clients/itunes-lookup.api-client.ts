@@ -1,4 +1,7 @@
-import type { AppMetadataClient } from "@packages/core/application/api-clients/app-metadata.api-client";
+import type {
+  AppLookup,
+  AppMetadataClient,
+} from "@packages/core/application/api-clients/app-metadata.api-client";
 import type { FetchLike } from "./apple-rss.api-client";
 
 interface ItunesLookupApiClientDeps {
@@ -7,25 +10,24 @@ interface ItunesLookupApiClientDeps {
 }
 
 /**
- * Resolves an app's name from the iTunes Lookup API
- * (`/lookup?id={appId}&country={country}` → `results[0].trackName`). The
- * customer-reviews RSS feed used for reviews does not include the app name, so this
- * is the worker's source for it. Best-effort: any failure (network, non-2xx,
- * unexpected shape, no result) resolves to `null`, since the name is non-critical.
+ * Looks up an app via the iTunes Lookup API
+ * (`/lookup?id={appId}&country={country}` → `results[0].trackName`). Used at
+ * registration time to validate the app exists and resolve its display name (the
+ * reviews feed carries neither). A successful HTTP response with no results means
+ * the app doesn't exist (`{ found: false }`); any transient failure (network or
+ * non-2xx) throws so callers can tell "absent" apart from "couldn't check".
  */
 export class ItunesLookupApiClient implements AppMetadataClient {
   constructor(private deps: ItunesLookupApiClientDeps) {}
 
-  async fetchAppName(appId: string, country: string): Promise<string | null> {
+  async lookup(appId: string, country: string): Promise<AppLookup> {
     const url = `${this.deps.baseUrl}/lookup?id=${encodeURIComponent(appId)}&country=${encodeURIComponent(country)}`;
-    try {
-      const res = await this.deps.fetch(url);
-      if (!res.ok) return null;
-      const json = (await res.json()) as { results?: Array<{ trackName?: unknown }> };
-      const name = json.results?.[0]?.trackName;
-      return typeof name === "string" && name.length > 0 ? name : null;
-    } catch {
-      return null;
-    }
+    const res = await this.deps.fetch(url);
+    if (!res.ok) throw new Error("iTunes lookup HTTP " + res.status + " for " + appId);
+    const json = (await res.json()) as { results?: Array<{ trackName?: unknown }> };
+    const result = json.results?.[0];
+    if (!result) return { found: false };
+    const name = result.trackName;
+    return { found: true, name: typeof name === "string" && name.length > 0 ? name : null };
   }
 }

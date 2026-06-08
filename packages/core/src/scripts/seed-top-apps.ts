@@ -1,4 +1,6 @@
+import { AppRegistryService } from "../application/services/app-registry.service";
 import { loadEnv } from "../config/env";
+import { ItunesLookupApiClient } from "../infrastructure/api-clients/itunes-lookup.api-client";
 import { createDb } from "../infrastructure/db/client";
 import { createRepositories } from "../infrastructure/repositories/repository.factory";
 
@@ -20,9 +22,11 @@ export function parseTopAppIds(json: unknown): string[] {
 
 /**
  * Seeds the `apps` table with the current US top-free apps so the worker has work
- * to do on first boot and the UI is pre-populated. Inserts **ids only** — the worker
- * fills each app's name from the lookup API when it first ingests it. Idempotent:
- * apps already present are skipped (create uses `ON CONFLICT DO NOTHING`).
+ * to do on first boot and the UI is pre-populated. Each id is onboarded through
+ * `AppRegistryService.register` — identical to a manual add — so seeded apps get
+ * their name + existence validation up front. Idempotent: apps already present are
+ * returned as-is (no re-lookup); a per-id failure is logged and skipped so one bad
+ * id never aborts the seed.
  *
  * Never throws on a feed failure — it exits 0 so it can't block stack startup (the
  * reviewer can still add apps manually); seeding is a convenience, not a requirement.
@@ -31,6 +35,11 @@ async function main() {
   const env = loadEnv();
   const db = createDb(env.DATABASE_URL);
   const repos = createRepositories(db);
+  const appMetadata = new ItunesLookupApiClient({
+    fetch: globalThis.fetch,
+    baseUrl: env.FEED_BASE_URL,
+  });
+  const registry = new AppRegistryService({ apps: repos.apps, appMetadata });
 
   let ids: string[] = [];
   try {
@@ -44,9 +53,13 @@ async function main() {
 
   let inserted = 0;
   for (const id of ids) {
-    if (await repos.apps.findById(id)) continue; // already tracked — skip
-    await repos.apps.create({ id });
-    inserted++;
+    const alreadyTracked = (await repos.apps.findById(id)) !== null;
+    try {
+      await registry.register(id);
+      if (!alreadyTracked) inserted++;
+    } catch (err) {
+      console.warn(`[seed] skipping ${id}: ${String(err)}`);
+    }
   }
 
   console.log(`[seed] top apps: ${inserted} inserted, ${ids.length - inserted} already present`);

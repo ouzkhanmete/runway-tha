@@ -70,16 +70,6 @@ describe("AppRepository", () => {
     });
   });
 
-  describe("updateName", () => {
-    test("sets the app's display name (initially null)", async () => {
-      await apps.create({ id: "rename-me" });
-      expect((await apps.findById("rename-me"))!.name).toBeNull();
-
-      await apps.updateName("rename-me", "My Cool App");
-      expect((await apps.findById("rename-me"))!.name).toBe("My Cool App");
-    });
-  });
-
   describe("claimDueForSync", () => {
     // Helper: claim with a fresh `now`, treating any claim older than 1 min as stuck.
     function claimOpts(staleBefore: Date, now = new Date()) {

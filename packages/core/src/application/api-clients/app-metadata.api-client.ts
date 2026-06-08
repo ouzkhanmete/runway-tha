@@ -1,9 +1,12 @@
 /**
- * Resolves app metadata (currently just the display name) by App Store id. The
- * customer-reviews RSS feed does not carry the app name, so the worker fills it
- * from here once per app.
+ * Resolves app metadata from the App Store by id. Used at registration time to
+ * (a) validate the app actually exists and (b) fetch its display name (the
+ * customer-reviews RSS feed carries neither).
  */
+export type AppLookup = { found: true; name: string | null } | { found: false };
+
 export interface AppMetadataClient {
-  /** The app's display name, or null if it can't be resolved (best-effort). */
-  fetchAppName(appId: string, country: string): Promise<string | null>;
+  /** Look up an app by id. `found:false` = it doesn't exist on the App Store.
+   *  Throws on transient errors (network / non-2xx) so callers can distinguish "absent" from "couldn't check". */
+  lookup(appId: string, country: string): Promise<AppLookup>;
 }

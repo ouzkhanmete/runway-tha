@@ -16,7 +16,11 @@ import { createApp } from "../../src/app";
 
 const db = getTestDb();
 const repos = createRepositories(db);
-const registry = new AppRegistryService({ apps: repos.apps });
+// Fake metadata client so registration never hits the real network.
+const fakeMetadata = {
+  lookup: async (id: string) => ({ found: true as const, name: "Test App " + id }),
+};
+const registry = new AppRegistryService({ apps: repos.apps, appMetadata: fakeMetadata });
 const reviewsQuerySchema = makeReviewsQuerySchema(48);
 
 const APP_ID = "888888001";

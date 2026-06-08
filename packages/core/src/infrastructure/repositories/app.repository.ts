@@ -74,10 +74,6 @@ export class DrizzleAppRepository implements AppRepository {
   async releaseClaim(appId: string): Promise<void> {
     await this.db.update(apps).set({ claimedAt: null }).where(eq(apps.id, appId));
   }
-
-  async updateName(appId: string, name: string): Promise<void> {
-    await this.db.update(apps).set({ name }).where(eq(apps.id, appId));
-  }
 }
 
 interface AppRow {

@@ -1,6 +1,4 @@
-import type { AppMetadataClient } from "@packages/core/application/api-clients/app-metadata.api-client";
 import type { AppRepository } from "@packages/core/application/repositories/app.repository";
-import type { App } from "@packages/core/domain/app";
 import { subMilliseconds } from "date-fns";
 import { mapWithConcurrency } from "./concurrency";
 import type { IngestReviewsService } from "./ingest-reviews.service";
@@ -8,8 +6,6 @@ import type { IngestReviewsService } from "./ingest-reviews.service";
 interface SyncSchedulerDeps {
   apps: AppRepository;
   ingest: IngestReviewsService;
-  /** Fills in an app's display name (the reviews feed doesn't carry it). */
-  appMetadata: AppMetadataClient;
   stalenessMs: number;
   /** A claim older than this is treated as stuck (crashed worker) and may be reclaimed. */
   claimTtlMs: number;
@@ -38,19 +34,11 @@ export class SyncSchedulerService {
       } catch {
         failed++; // ingestApp already records an error sync_run
       } finally {
-        // Best-effort name backfill + lease release. Both are non-fatal: a failed
-        // enrich/release never affects `failed`, and the claim TTL recovers a missed release.
-        await this.enrichName(app).catch(() => {});
+        // Release the lease (best-effort): a failed release never affects `failed`,
+        // and the claim TTL recovers a missed release.
         await this.deps.apps.releaseClaim(app.id).catch(() => {});
       }
     });
     return { processed: claimed.length, failed };
-  }
-
-  /** Fills the app's display name from the lookup API the first time we see it (name === null). */
-  private async enrichName(app: App): Promise<void> {
-    if (app.name) return;
-    const name = await this.deps.appMetadata.fetchAppName(app.id, app.country);
-    if (name) await this.deps.apps.updateName(app.id, name);
   }
 }

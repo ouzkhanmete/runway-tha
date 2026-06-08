@@ -23,7 +23,4 @@ export interface AppRepository {
 
   /** Releases the claim lease (sets `claimed_at` back to NULL). Called after a sync finishes. */
   releaseClaim(appId: string): Promise<void>;
-
-  /** Sets the app's display name (filled by the worker from the lookup API). */
-  updateName(appId: string, name: string): Promise<void>;
 }

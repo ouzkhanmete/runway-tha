@@ -2,6 +2,7 @@ import {
   AppRegistryService,
   createDb,
   createRepositories,
+  ItunesLookupApiClient,
   loadEnv,
   ReviewQueryService,
 } from "@packages/core/index";
@@ -15,7 +16,13 @@ export function buildApi(): { env: ReturnType<typeof loadEnv>; deps: ApiDeps } {
   const repos = createRepositories(db);
 
   const reviewQuery = new ReviewQueryService({ reviews: repos.reviews });
-  const registry = new AppRegistryService({ apps: repos.apps });
+  // The reviews feed has no app name and can't validate existence; the iTunes
+  // lookup API does both synchronously at registration time.
+  const appMetadata = new ItunesLookupApiClient({
+    fetch: globalThis.fetch,
+    baseUrl: env.FEED_BASE_URL,
+  });
+  const registry = new AppRegistryService({ apps: repos.apps, appMetadata });
 
   const reviewsQuerySchema = makeReviewsQuerySchema(env.REVIEW_WINDOW_HOURS_DEFAULT);
 

@@ -11,7 +11,16 @@ import { createApp } from "../../src/app";
 const db = getTestDb();
 const repos = createRepositories(db);
 const reviewQuery = new ReviewQueryService({ reviews: repos.reviews });
-const registry = new AppRegistryService({ apps: repos.apps });
+// Fake metadata client so registration never hits the real network: any numeric id
+// resolves to a name, except NOT_FOUND_ID which behaves like a non-existent app.
+const NOT_FOUND_ID = "111111111";
+const fakeMetadata = {
+  lookup: async (id: string) =>
+    id === NOT_FOUND_ID
+      ? { found: false as const }
+      : { found: true as const, name: "Test App " + id },
+};
+const registry = new AppRegistryService({ apps: repos.apps, appMetadata: fakeMetadata });
 const reviewsQuerySchema = makeReviewsQuerySchema(48);
 const app = createApp({ reviewQuery, registry, reviewsQuerySchema });
 
@@ -75,6 +84,19 @@ describe("POST /apps", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe("VALIDATION");
+  });
+
+  test("400 when appId is numeric but the app does not exist on the App Store", async () => {
+    const res = await app.request("/apps", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ appId: NOT_FOUND_ID }),
+    });
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error.code).toBe("VALIDATION");
+    expect(body.error.message).toContain("not found");
   });
 });
 
