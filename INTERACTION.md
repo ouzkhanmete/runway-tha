@@ -176,3 +176,15 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - **Docs** — etl/api/decisions/data-model/frontend/README updated to "resolved at registration, not by the worker."
 
 **Verified live (full-stack rebuild):** UUID → `400` "appId must be numeric"; non-existent `9999999999` → `400` "App not found in the App Store: 9999999999"; valid `324684580` → `201` with `name: "Spotify: Music and Podcasts"` set **immediately**. **116/116 tests green**; all packages type-check clean; Biome-formatted.
+
+---
+
+## Turn 12 — UI spacing, diagram redraw, and a no-seed restart test (2026-06-08)
+
+**Prompt:** (1) a little more space under the title on the UI; (2) redraw the README "Runtime data flow" diagram as nicer pixel art; (3) test that the app keeps its data after a restart, using docker-compose full **without** the seed on restart.
+
+**What changed:**
+- **UI** — added `.app-title` styling (size/weight + 20px bottom margin) so the selected app name no longer sits cramped against the review list.
+- **Diagram** — replaced the bracket-tag "Runtime data flow" with aligned rounded boxes (`╭─╮`/`╰─╯`) and labelled `▼` arrows, generated to be pixel-aligned (single-width glyphs only). Updated to the current design (Apple feed + iTunes Lookup feed the worker; Postgres bind-mounted/durable; register writes the apps row).
+
+**Persistence test (no re-seed):** brought the full stack up on the persisted `.data/postgres-full` (11 apps incl. a manually-added **Spotify**, which the seed never adds; 5500 reviews), then `docker compose … down` (all containers removed) and back up with `--no-deps` so the **seed container never ran**. After: **apps=11, reviews=5500, Spotify present with its name** — identical. Data survived a full container teardown/recreate purely via the bind mount, with no seeding. Confirms R3.
