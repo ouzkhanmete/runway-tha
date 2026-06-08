@@ -1,29 +1,23 @@
 import {
-  loadEnv,
-  createDb,
-  DrizzleAppRepository,
-  DrizzleReviewRepository,
-  ReviewQueryService,
   AppRegistryService,
-} from "@runway/core";
-import { makeReviewsQuerySchema } from "@runway/shared";
+  createDb,
+  createRepositories,
+  loadEnv,
+  ReviewQueryService,
+} from "@packages/core/index";
+import { makeReviewsQuerySchema } from "@packages/shared/index";
 import type { ApiDeps } from "./app";
 
 export function buildApi(): { env: ReturnType<typeof loadEnv>; deps: ApiDeps } {
   const env = loadEnv();
   const db = createDb(env.DATABASE_URL);
 
-  const appRepo = new DrizzleAppRepository(db);
-  const reviewRepo = new DrizzleReviewRepository(db);
+  const repos = createRepositories(db);
 
-  const reviewQuery = new ReviewQueryService({ reviews: reviewRepo });
-  const registry = new AppRegistryService({ apps: appRepo });
+  const reviewQuery = new ReviewQueryService({ reviews: repos.reviews });
+  const registry = new AppRegistryService({ apps: repos.apps });
 
-  // The window allow-list is configurable via env (REVIEW_WINDOW_HOURS_*).
-  const reviewsQuerySchema = makeReviewsQuerySchema(
-    env.REVIEW_WINDOW_HOURS_ALLOWED,
-    env.REVIEW_WINDOW_HOURS_DEFAULT,
-  );
+  const reviewsQuerySchema = makeReviewsQuerySchema(env.REVIEW_WINDOW_HOURS_DEFAULT);
 
   return {
     env,

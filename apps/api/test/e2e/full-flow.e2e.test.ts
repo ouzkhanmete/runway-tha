@@ -1,26 +1,23 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import type { Review } from "@packages/core/index";
 import {
-  DrizzleAppRepository,
-  DrizzleReviewRepository,
-  DrizzleSyncRunRepository,
+  AppRegistryService,
+  createRepositories,
   IngestReviewsService,
   ReviewQueryService,
-  AppRegistryService,
-} from "@runway/core";
-import type { Review } from "@runway/core";
-import { ReviewDtoSchema } from "@runway/shared";
+} from "@packages/core/index";
+import { Country, makeReviewsQuerySchema, ReviewDtoSchema } from "@packages/shared/index";
 import {
-  getTestDb,
   ensureMigrated,
+  getTestDb,
   truncateAll,
-} from "../../node_modules/@runway/core/test/helpers/test-db";
+} from "../../../../packages/core/test/helpers/test-db";
 import { createApp } from "../../src/app";
 
 const db = getTestDb();
-const appRepo = new DrizzleAppRepository(db);
-const reviewRepo = new DrizzleReviewRepository(db);
-const syncRunRepo = new DrizzleSyncRunRepository(db);
-const registry = new AppRegistryService({ apps: appRepo });
+const repos = createRepositories(db);
+const registry = new AppRegistryService({ apps: repos.apps });
+const reviewsQuerySchema = makeReviewsQuerySchema(48);
 
 const APP_ID = "888888001";
 const NOW = new Date("2026-06-08T12:00:00Z");
@@ -74,26 +71,27 @@ beforeEach(() => truncateAll(db));
 describe("full-flow e2e: feed → DB → API", () => {
   test("ingestApp → GET /apps/:id/reviews?windowHours=720 returns ingested reviews newest-first", async () => {
     // Register app
-    const registeredApp = await appRepo.create({ id: APP_ID, country: "us" });
+    const registeredApp = await repos.apps.create({ id: APP_ID, country: Country.US });
     expect(registeredApp.id).toBe(APP_ID);
 
     // Ingest via fake feed
     const ingestService = new IngestReviewsService({
       feed: makeFakeFeed(FAKE_REVIEWS),
-      reviews: reviewRepo,
-      syncRuns: syncRunRepo,
+      reviews: repos.reviews,
+      syncRuns: repos.syncRuns,
     });
     const { reviewsUpserted } = await ingestService.ingestApp(registeredApp);
     expect(reviewsUpserted).toBe(FAKE_REVIEWS.length);
 
     // Query via Hono app with fixed clock at NOW so window math is deterministic
     const reviewQueryWithClock = new ReviewQueryService({
-      reviews: reviewRepo,
+      reviews: repos.reviews,
       clock: () => NOW,
     });
     const testApp = createApp({
       reviewQuery: reviewQueryWithClock,
       registry,
+      reviewsQuerySchema,
     });
 
     const res = await testApp.request(`/apps/${APP_ID}/reviews?windowHours=720`);
@@ -114,9 +112,7 @@ describe("full-flow e2e: feed → DB → API", () => {
     }
 
     // Newest-first ordering
-    const timestamps = body.map((r: { submittedAt: string }) =>
-      new Date(r.submittedAt).getTime()
-    );
+    const timestamps = body.map((r: { submittedAt: string }) => new Date(r.submittedAt).getTime());
     for (let i = 0; i < timestamps.length - 1; i++) {
       expect(timestamps[i]).toBeGreaterThanOrEqual(timestamps[i + 1]);
     }
@@ -129,12 +125,12 @@ describe("full-flow e2e: feed → DB → API", () => {
   });
 
   test("second ingestApp with identical reviews does NOT grow the row count (dedup / restart-safety)", async () => {
-    const registeredApp = await appRepo.create({ id: APP_ID, country: "us" });
+    const registeredApp = await repos.apps.create({ id: APP_ID, country: Country.US });
 
     const ingestService = new IngestReviewsService({
       feed: makeFakeFeed(FAKE_REVIEWS),
-      reviews: reviewRepo,
-      syncRuns: syncRunRepo,
+      reviews: repos.reviews,
+      syncRuns: repos.syncRuns,
     });
 
     // First ingest
@@ -145,12 +141,13 @@ describe("full-flow e2e: feed → DB → API", () => {
 
     // Row count must be the same as after the first ingest
     const reviewQueryWithClock = new ReviewQueryService({
-      reviews: reviewRepo,
+      reviews: repos.reviews,
       clock: () => NOW,
     });
     const testApp = createApp({
       reviewQuery: reviewQueryWithClock,
       registry,
+      reviewsQuerySchema,
     });
 
     const res = await testApp.request(`/apps/${APP_ID}/reviews?windowHours=720`);

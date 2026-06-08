@@ -1,5 +1,5 @@
-import { buildApi } from "./composition-root";
 import { createApp } from "./app";
+import { buildApi } from "./composition-root";
 
 const { env, deps } = buildApi();
 const app = createApp(deps);

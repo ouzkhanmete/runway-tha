@@ -1,24 +1,28 @@
+import type { AppRegistryService, ReviewQueryService } from "@packages/core/index";
+import type { ReviewsQuerySchemaType } from "@packages/shared/index";
 import { Hono } from "hono";
-import type { ReviewQueryService, AppRegistryService } from "@runway/core";
-import type { ReviewsQuerySchemaType } from "@runway/shared";
+import { AppsController } from "./controllers/apps.controller";
+import { HealthController } from "./controllers/health.controller";
+import { ReviewsController } from "./controllers/reviews.controller";
 import { errorHandler } from "./middleware/error";
-import { registerHealthRoutes } from "./routes/health";
-import { registerAppRoutes } from "./routes/apps";
-import { registerReviewRoutes } from "./routes/reviews";
 
 export interface ApiDeps {
   reviewQuery: ReviewQueryService;
   registry: AppRegistryService;
-  /** Window-validation schema; built from env at the composition root. Falls back to the shared default. */
-  reviewsQuerySchema?: ReviewsQuerySchemaType;
+  /** Window-validation schema; built from env at the composition root. */
+  reviewsQuerySchema: ReviewsQuerySchemaType;
 }
 
 export function createApp(deps: ApiDeps): Hono {
   const app = new Hono();
 
-  registerHealthRoutes(app, deps);
-  registerAppRoutes(app, deps);
-  registerReviewRoutes(app, deps);
+  new HealthController().routes(app);
+  new AppsController({ registry: deps.registry }).routes(app);
+  new ReviewsController({
+    reviewQuery: deps.reviewQuery,
+    registry: deps.registry,
+    reviewsQuerySchema: deps.reviewsQuerySchema,
+  }).routes(app);
 
   app.onError(errorHandler);
 

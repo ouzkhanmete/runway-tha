@@ -1,24 +1,19 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { AppRegistryService, createRepositories, ReviewQueryService } from "@packages/core/index";
+import { AppDtoSchema, makeReviewsQuerySchema } from "@packages/shared/index";
 import {
-  DrizzleAppRepository,
-  DrizzleReviewRepository,
-  ReviewQueryService,
-  AppRegistryService,
-} from "@runway/core";
-import { AppDtoSchema } from "@runway/shared";
-import {
-  getTestDb,
   ensureMigrated,
+  getTestDb,
   truncateAll,
-} from "../../node_modules/@runway/core/test/helpers/test-db";
+} from "../../../../packages/core/test/helpers/test-db";
 import { createApp } from "../../src/app";
 
 const db = getTestDb();
-const appRepo = new DrizzleAppRepository(db);
-const reviewRepo = new DrizzleReviewRepository(db);
-const reviewQuery = new ReviewQueryService({ reviews: reviewRepo });
-const registry = new AppRegistryService({ apps: appRepo });
-const app = createApp({ reviewQuery, registry });
+const repos = createRepositories(db);
+const reviewQuery = new ReviewQueryService({ reviews: repos.reviews });
+const registry = new AppRegistryService({ apps: repos.apps });
+const reviewsQuerySchema = makeReviewsQuerySchema(48);
+const app = createApp({ reviewQuery, registry, reviewsQuerySchema });
 
 beforeAll(ensureMigrated);
 beforeEach(() => truncateAll(db));
@@ -54,7 +49,7 @@ describe("POST /apps", () => {
     expect(res2.status).toBe(201);
 
     // Only one row in the DB
-    const list = await appRepo.list();
+    const list = await repos.apps.list();
     expect(list.filter((a) => a.id === "595068606")).toHaveLength(1);
   });
 

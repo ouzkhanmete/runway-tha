@@ -1,24 +1,19 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { AppRegistryService, createRepositories, ReviewQueryService } from "@packages/core/index";
+import { Country, makeReviewsQuerySchema, ReviewDtoSchema } from "@packages/shared/index";
 import {
-  DrizzleAppRepository,
-  DrizzleReviewRepository,
-  ReviewQueryService,
-  AppRegistryService,
-} from "@runway/core";
-import { ReviewDtoSchema } from "@runway/shared";
-import {
-  getTestDb,
   ensureMigrated,
+  getTestDb,
   truncateAll,
-} from "../../node_modules/@runway/core/test/helpers/test-db";
+} from "../../../../packages/core/test/helpers/test-db";
 import { createApp } from "../../src/app";
 
 const db = getTestDb();
-const appRepo = new DrizzleAppRepository(db);
-const reviewRepo = new DrizzleReviewRepository(db);
-const reviewQuery = new ReviewQueryService({ reviews: reviewRepo });
-const registry = new AppRegistryService({ apps: appRepo });
-const app = createApp({ reviewQuery, registry });
+const repos = createRepositories(db);
+const reviewQuery = new ReviewQueryService({ reviews: repos.reviews });
+const registry = new AppRegistryService({ apps: repos.apps });
+const reviewsQuerySchema = makeReviewsQuerySchema(48);
+const app = createApp({ reviewQuery, registry, reviewsQuerySchema });
 
 const APP_ID = "595068606";
 const NOW = new Date("2026-06-08T12:00:00Z");
@@ -27,7 +22,7 @@ beforeAll(ensureMigrated);
 beforeEach(() => truncateAll(db));
 
 async function seedApp() {
-  return appRepo.create({ id: APP_ID, country: "us" });
+  return repos.apps.create({ id: APP_ID, country: Country.US });
 }
 
 async function seedReviews() {
@@ -67,7 +62,7 @@ async function seedReviews() {
       submittedAt: new Date("2026-06-05T12:00:00Z"), // 72h ago
     },
   ];
-  await reviewRepo.upsertMany([...inWindow, ...outOfWindow]);
+  await repos.reviews.upsertMany([...inWindow, ...outOfWindow]);
   return { inWindow, outOfWindow };
 }
 
@@ -78,11 +73,15 @@ describe("GET /apps/:appId/reviews", () => {
 
     // Use a fixed clock so we know exactly what's "within 48h"
     const reviewQueryWithClock = new ReviewQueryService({
-      reviews: reviewRepo,
+      reviews: repos.reviews,
       clock: () => NOW,
     });
-    const registryFixed = new AppRegistryService({ apps: appRepo });
-    const appFixed = createApp({ reviewQuery: reviewQueryWithClock, registry: registryFixed });
+    const registryFixed = new AppRegistryService({ apps: repos.apps });
+    const appFixed = createApp({
+      reviewQuery: reviewQueryWithClock,
+      registry: registryFixed,
+      reviewsQuerySchema,
+    });
 
     const res = await appFixed.request(`/apps/${APP_ID}/reviews?windowHours=48`);
     expect(res.status).toBe(200);

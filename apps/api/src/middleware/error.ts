@@ -1,6 +1,6 @@
+import { NotFoundError } from "@packages/core/index";
 import type { Context } from "hono";
 import { ZodError } from "zod";
-import { NotFoundError } from "@runway/core";
 
 export function errorHandler(err: unknown, c: Context) {
   if (err instanceof ZodError) {
@@ -12,7 +12,7 @@ export function errorHandler(err: unknown, c: Context) {
           details: err.issues,
         },
       },
-      400
+      400,
     );
   }
 
@@ -24,7 +24,7 @@ export function errorHandler(err: unknown, c: Context) {
           message: err.message,
         },
       },
-      404
+      404,
     );
   }
 
@@ -36,6 +36,6 @@ export function errorHandler(err: unknown, c: Context) {
         message: "Internal server error",
       },
     },
-    500
+    500,
   );
 }

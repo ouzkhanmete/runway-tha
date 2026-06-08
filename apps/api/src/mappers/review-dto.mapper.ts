@@ -1,6 +1,6 @@
-import type { Review } from "@runway/core";
-import type { App } from "@runway/core";
-import type { ReviewDto, AppDto } from "@runway/shared";
+import type { App, Review } from "@packages/core/index";
+import type { AppDto, ReviewDto } from "@packages/shared/index";
+import { formatISO } from "date-fns";
 
 export function toReviewDto(r: Review): ReviewDto {
   return {
@@ -11,7 +11,7 @@ export function toReviewDto(r: Review): ReviewDto {
     content: r.content,
     rating: r.rating,
     version: r.version,
-    submittedAt: r.submittedAt.toISOString(),
+    submittedAt: formatISO(r.submittedAt),
   };
 }
 
@@ -20,6 +20,6 @@ export function toAppDto(a: App): AppDto {
     id: a.id,
     name: a.name,
     country: a.country,
-    createdAt: a.createdAt.toISOString(),
+    createdAt: formatISO(a.createdAt),
   };
 }
