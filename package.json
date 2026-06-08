@@ -10,7 +10,7 @@
     "db:test:down": "docker compose -f docker/docker-compose.test.yml down",
     "test": "bun test",
     "generate": "bun run --cwd packages/core generate",
-    "migrate": "bun run --cwd packages/core migrate",
+    "migrate": "bun run packages/core/src/infrastructure/db/migrate.ts",
     "dev:api": "bun run --cwd apps/api dev",
     "dev:worker": "bun run --cwd apps/worker dev",
     "dev:web": "bun run --cwd apps/web dev"

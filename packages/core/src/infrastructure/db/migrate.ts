@@ -1,7 +1,10 @@
 import { migrate } from "drizzle-orm/bun-sql/migrator";
 import { createDb } from "./client";
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL required");
-const db = createDb(url);
+import { loadEnv } from "../../config/env";
+
+// Use the same env loader as the apps so DATABASE_URL defaults to the local dev
+// URL when unset (matching `drizzle.config.ts`) and respects an explicit value.
+const { DATABASE_URL } = loadEnv();
+const db = createDb(DATABASE_URL);
 await migrate(db, { migrationsFolder: `${import.meta.dir}/migrations` });
-console.log("migrations applied");
+console.log(`migrations applied to ${DATABASE_URL}`);
