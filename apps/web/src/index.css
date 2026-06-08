@@ -84,6 +84,18 @@ body {
   border-color: #0071e3;
 }
 
+/* Error state: input turns reddish when registration fails */
+.add-app-form.error input[type="text"],
+.add-app-form input[type="text"].error {
+  border-color: #ff3b30;
+}
+
+.add-app-form.error input[type="text"]:focus,
+.add-app-form input[type="text"].error:focus {
+  border-color: #ff3b30;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
+}
+
 .add-app-form button {
   background: #0071e3;
   color: #fff;
