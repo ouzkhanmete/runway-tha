@@ -17,31 +17,37 @@ Built as a take-home assessment with [Claude Code](https://docs.claude.com/en/do
 ### Runtime data flow
 
 ```
-   Apple App Store  ·  customer-reviews RSS feed
-   │
-   │   worker fetches ≤10 pages (~500 newest reviews) per app, per sync
-   ▼
-   [ WORKER ]  apps/worker  —  the ONLY writer of `reviews`
-   │     • ~10s tick, self-scheduling setTimeout → runs never overlap
-   │     • claims due apps atomically:  UPDATE … FOR UPDATE SKIP LOCKED
-   │     • upserts by stable review id → idempotent, restart-safe
-   │     • records a sync_run (success | error) every tick
-   ▼  writes
-   [ POSTGRES 18 ]   apps  ·  reviews  ·  sync_runs
-   │     • reviews PK = RSS review id;  index (app_id, submitted_at↓, id↓)
-   │     • apps carries a claim lease (claimed_at) for multi-worker safety
-   │     • sync_runs = per-tick audit log + the "is this app due?" signal
-   ▼  reads reviews / writes the apps row only
-   [ API ]  apps/api · Hono   (never writes reviews)
-   │     • GET /apps      ·  POST /apps   (idempotent register)
-   │     • GET /apps/:id/reviews?windowHours&limit&cursor
-   │           → { items: ReviewDto[], nextCursor }   (keyset pages of 5)
-   ▼  JSON · Zod-validated DTOs · Vite dev server proxies /api → :3000
-   [ WEB ]  apps/web · React + TanStack Query
-   │     • app selector (kept in the URL as ?appId=) · window picker 48h…1y
-   │     • infinite-scroll review list (keyset cursor pagination)
-   ▼
-   Browser
+   ╭────────────────────────────────────────────────────────────────╮
+   │  APPLE APP STORE                                               │
+   │    customer-reviews RSS feed  ·  iTunes Lookup API             │
+   ╰────────────────────────────────────────────────────────────────╯
+                                    │   worker polls & fetches ≤10 pages  (~500 reviews/app)
+                                    ▼
+   ╭────────────────────────────────────────────────────────────────╮
+   │  WORKER  ·  apps/worker   (sole writer of reviews)             │
+   │    claim ▸ ingest ▸ release   ·   ~10s tick, never overlaps    │
+   ╰────────────────────────────────────────────────────────────────╯
+                                    │   upsert by stable review id  (idempotent → restart-safe)
+                                    ▼
+   ╭────────────────────────────────────────────────────────────────╮
+   │  POSTGRES 18                                                   │
+   │    apps · reviews · sync_runs   (bind-mounted, durable)        │
+   ╰────────────────────────────────────────────────────────────────╯
+                                    │   API reads reviews   ·   register writes the apps row
+                                    ▼
+   ╭────────────────────────────────────────────────────────────────╮
+   │  API  ·  apps/api  (Hono)                                      │
+   │    GET/POST /apps   ·   GET /apps/:id/reviews?window&cursor    │
+   ╰────────────────────────────────────────────────────────────────╯
+                                    │   JSON · Zod-validated DTOs   ·   keyset pages of 5
+                                    ▼
+   ╭────────────────────────────────────────────────────────────────╮
+   │  WEB  ·  apps/web  (React + TanStack Query)                    │
+   │    app selector · window picker · infinite-scroll list         │
+   ╰────────────────────────────────────────────────────────────────╯
+                                    │
+                                    ▼
+                                 Browser
 ```
 
 The two halves are intentionally decoupled: the **worker writes**, the **API reads**, and Postgres is the contract between them. There is no in-process coupling, no shared queue, and no cursor/watermark to keep in sync — the database is the single source of truth for both "which apps to poll" and "what reviews exist".
