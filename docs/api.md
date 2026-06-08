@@ -107,6 +107,6 @@ Error handling is centralised in `apps/api/src/middleware/error.ts` via Hono's `
 
 ## Allowed window hours
 
-`REVIEW_WINDOW_HOURS_ALLOWED` defaults to `48,168,720` (2 days, 7 days, 30 days). This is validated server-side by `ReviewsQuerySchema` and reflected in the frontend's window picker. The default `windowHours=48` will return an empty list for apps whose newest review is older than two days — use `168` or `720` for those.
+`REVIEW_WINDOW_HOURS_ALLOWED` / `REVIEW_WINDOW_HOURS_DEFAULT` default to `48,168,720` (2 / 7 / 30 days) and `48`. The API composition root reads these and builds the validation schema via `makeReviewsQuerySchema(...)`, so the env vars genuinely drive what the server accepts (any value outside the set → `400`). The frontend's window picker mirrors the default allow-list (`ALLOWED_WINDOW_HOURS` in `@runway/shared`). The default `windowHours=48` returns an empty list for apps whose newest review is older than two days — use `168` or `720` for those.
 
 See [`docs/architecture.md`](architecture.md) for the composition root and [`docs/frontend.md`](frontend.md) for the matching client-side types.

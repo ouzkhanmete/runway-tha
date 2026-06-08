@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { ReviewDtoSchema, RegisterAppRequestSchema, ReviewsQuerySchema, AppDtoSchema } from "../src";
+import { ReviewDtoSchema, RegisterAppRequestSchema, ReviewsQuerySchema, AppDtoSchema, makeReviewsQuerySchema } from "../src";
 
 test("ReviewDtoSchema parses a valid review", () => {
   const dto = ReviewDtoSchema.parse({
@@ -28,4 +28,10 @@ test("ReviewsQuerySchema coerces string and clamps to allowed set", () => {
 });
 test("AppDtoSchema parses", () => {
   expect(AppDtoSchema.parse({ id:"1", name:null, country:"us", createdAt:"x" }).country).toBe("us");
+});
+test("makeReviewsQuerySchema honors a custom allow-list and default", () => {
+  const schema = makeReviewsQuerySchema([48, 72], 72);
+  expect(schema.parse({}).windowHours).toBe(72);          // custom default
+  expect(schema.parse({ windowHours: "48" }).windowHours).toBe(48);
+  expect(() => schema.parse({ windowHours: 168 })).toThrow(); // 168 not in custom set
 });
