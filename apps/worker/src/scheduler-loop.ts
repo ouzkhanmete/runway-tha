@@ -1,9 +1,6 @@
-import type { SyncSchedulerService } from "@runway/core";
+import type { SyncSchedulerService } from "@packages/core/index";
 
-export function startLoop(
-  scheduler: SyncSchedulerService,
-  tickMs: number
-): { stop: () => void } {
+export function startLoop(scheduler: SyncSchedulerService, tickMs: number): { stop: () => void } {
   let isRunning = false;
 
   async function tick() {
@@ -15,7 +12,7 @@ export function startLoop(
     try {
       const result = await scheduler.runDueOnce();
       console.log(
-        `[worker] Sync run complete — processed: ${result.processed}, failed: ${result.failed}`
+        `[worker] Sync run complete — processed: ${result.processed}, failed: ${result.failed}`,
       );
     } catch (err) {
       console.error("[worker] Unexpected error in scheduler run:", err);

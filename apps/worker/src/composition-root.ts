@@ -1,24 +1,19 @@
 import {
-  loadEnv,
+  AppleRssApiClient,
   createDb,
-  DrizzleAppRepository,
-  DrizzleReviewRepository,
-  DrizzleSyncRunRepository,
-  AppStoreFeedClient,
+  createRepositories,
   IngestReviewsService,
-  AppRegistryService,
+  loadEnv,
   SyncSchedulerService,
-} from "@runway/core";
+} from "@packages/core/index";
 
 export function buildWorker() {
   const env = loadEnv();
   const db = createDb(env.DATABASE_URL);
 
-  const appRepo = new DrizzleAppRepository(db);
-  const reviewRepo = new DrizzleReviewRepository(db);
-  const syncRunRepo = new DrizzleSyncRunRepository(db);
+  const repos = createRepositories(db);
 
-  const feedClient = new AppStoreFeedClient({
+  const feed = new AppleRssApiClient({
     fetch: globalThis.fetch,
     baseUrl: env.FEED_BASE_URL,
     maxPages: env.WORKER_MAX_PAGES,
@@ -26,19 +21,17 @@ export function buildWorker() {
   });
 
   const ingest = new IngestReviewsService({
-    feed: feedClient,
-    reviews: reviewRepo,
-    syncRuns: syncRunRepo,
+    feed,
+    reviews: repos.reviews,
+    syncRuns: repos.syncRuns,
   });
 
   const scheduler = new SyncSchedulerService({
-    apps: appRepo,
+    apps: repos.apps,
     ingest,
-    stalenessMin: env.WORKER_STALENESS_MIN,
+    stalenessMs: env.WORKER_STALENESS_MS,
     concurrency: env.WORKER_CONCURRENCY,
   });
 
-  const registry = new AppRegistryService({ apps: appRepo });
-
-  return { env, scheduler, registry };
+  return { env, scheduler };
 }
