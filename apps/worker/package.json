@@ -1,0 +1,12 @@
+{
+  "name": "@runway/worker",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "start": "bun run src/main.ts"
+  },
+  "dependencies": {
+    "@runway/core": "workspace:*",
+    "@runway/shared": "workspace:*"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@runway/api",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/main.ts",
+    "start": "bun run src/main.ts"
+  },
+  "dependencies": {
+    "@runway/core": "workspace:*",
+    "@runway/shared": "workspace:*",
+    "hono": "^4.12.24",
+    "zod": "^4.4.3"
+  }
+}
