@@ -1,5 +1,5 @@
 {
-  "id": "1336089d-c959-4a4b-80cf-df8a0573f1ab",
+  "id": "8e83b3b7-c008-4a4b-be02-18bebe7ee0b3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -203,7 +203,35 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "sync_runs_app_status_finished_idx": {
+          "name": "sync_runs_app_status_finished_idx",
+          "columns": [
+            {
+              "expression": "app_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "finished_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "sync_runs_app_id_apps_id_fk": {
           "name": "sync_runs_app_id_apps_id_fk",
