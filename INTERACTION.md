@@ -110,3 +110,20 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - **Docs** — `etl.md` (new "Multi-worker safety: the claim lease" section + self-scheduling loop + config table), `data-model.md` (`claimed_at`, index rationale, additive idempotent migration), `api.md` (`claimedAt` on `AppDto`), `decisions.md` (DB claim over an external queue), `testing.md` + `CLAUDE.md` invariants + test count → **89**.
 
 **Verified live:** **89/89 tests green** (incl. a real-Postgres integration test asserting two concurrent claims never grab the same app, and the back-to-back no-overlap loop test); all five packages type-check clean; migration `0001` applied to the dev DB and confirmed re-runnable; a one-shot live tick against the real Apple feed ran **claim → ingest (10 pages / ~450 reviews) → release**, leaving `claimed_at` back to `NULL`. Biome-formatted.
+
+---
+
+## Turn 7 — UX + pagination pass: URL state, more windows, cursor pagination, fast first sync (2026-06-08)
+
+**Prompt:** five improvements (plus questions): (1) put the selected app in `?appId=` so a refresh preserves it; (2) read the query param as the source of truth; (3) schedule a faster first sync after adding an app with a tiny loader, and lower the interval to 10 s; (4) add 60d/90d/1y windows; (5) cursor-based (not offset) pagination, 5 reviews/page, scroll-triggered, sorted by date with an index. Plus: is there an API to discover app ids to test with?
+
+**Answered:** keyset pagination needs a total order → sort by `(submitted_at, id)` with a matching index. App-id discovery: the **iTunes Search API** (`/search?term=…&entity=software` → `trackId`) and the **top-apps RSS** (`im:id`), both verified live.
+
+**What changed (4 feature commits):**
+- **Windows** — added 60d/90d/1y presets; raised `MAX_WINDOW_HOURS` 720 → 8760 (1 year).
+- **URL as source of truth** — new `useQueryParam` hook binds the selected app to `?appId=` (push on select, replace for the default, `popstate`-aware); URL logic in pure helpers (`readParam`/`buildParamUrl`) unit-tested without a DOM (happy-dom doesn't link history → location).
+- **Cursor pagination** — reviews endpoint now returns `{ items, nextCursor }` with `limit` (default 5) + opaque `cursor`; keyset `WHERE (submitted_at, id) < (?, ?) ORDER BY submitted_at DESC, id DESC LIMIT n+1`; index extended to `(app_id, submitted_at DESC, id DESC)` via idempotent migration `0002`; `findRecent` → `findRecentPage`, `getRecentPage`; new `ValidationError` → 400 on malformed cursor; web `useReviews` → `useInfiniteQuery` with an IntersectionObserver sentinel ("Loading more…" / "You've reached the end.").
+- **Fast first sync** — `WORKER_TICK_MS` 30 s → 10 s; `AddAppForm` `onAdded` selects the new app and `App.tsx` polls (`pollUntilData`) with a "Fetching the latest reviews…" loader until the first batch lands (30s ceiling).
+- **Docs** — `api.md`, `data-model.md`, `decisions.md` (keyset over OFFSET), `frontend.md`, `testing.md`, plus `architecture.md`/`CLAUDE.md` window/count touch-ups.
+
+**Verified:** **102/102 tests green** (repo walks every page with no gaps/repeats + id tie-break determinism; e2e covers cursor pagination, explicit limit, malformed-cursor 400); all five packages type-check clean; Biome-formatted.
