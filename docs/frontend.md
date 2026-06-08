@@ -47,10 +47,12 @@ A module-level singleton `apiClient = createApiClient()` is used by all hooks. T
 
 ### `App.tsx`
 
-Root component. Holds two pieces of state:
+Root component. State:
 
-- `selectedAppId` — defaults to the first app once `useApps` resolves.
+- `selectedAppId` — backed by the **`?appId=` URL query param** via `useQueryParam` (the URL is the source of truth), so the selection survives a refresh and is shareable. If the URL names no app — or one that no longer exists — it defaults to the first app via `history.replaceState` (no spurious history entry). Picking an app in the `AppSelector` pushes a new history entry, so back/forward moves between apps.
 - `windowHours` — defaults to `48`.
+
+`useQueryParam` keeps the URL logic in pure helpers (`readParam`, `buildParamUrl`) that are unit-tested directly; the hook itself is thin glue over `window.history` + a `popstate` listener.
 
 Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`) and the `ReviewList`.
 
