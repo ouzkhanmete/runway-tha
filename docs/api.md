@@ -1,6 +1,6 @@
 # API
 
-Hono REST API (`apps/api`). Listens on `APP_PORT` (default `3000`). No authentication.
+Hono REST API (`apps/api`). Listens on `APP_PORT` (default `3000`). No authentication. Routes are organised into controller classes (`HealthController`, `AppsController`, `ReviewsController` in `apps/api/src/controllers/`), each exposing a `routes(app)` method registered by the Hono app.
 
 ## Endpoints
 
@@ -46,11 +46,11 @@ After registration the worker picks the new app up on its next tick — no manua
 
 | Param | Default | Allowed values | Notes |
 |---|---|---|---|
-| `windowHours` | `48` | `48`, `168`, `720` | Clamped to the allowed set; any other value → 400 |
+| `windowHours` | `48` (env `REVIEW_WINDOW_HOURS_DEFAULT`) | Any integer 1–720 | Out-of-range or non-integer → 400 |
 
 Returns `ReviewDto[]` sorted newest-first (`submittedAt DESC`). Empty array if no reviews exist within the window.
 
-**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours` is not in the allowed set.
+**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours` is outside `[1, 720]`.
 
 ## DTOs
 
@@ -105,8 +105,10 @@ All error responses use a consistent JSON structure:
 
 Error handling is centralised in `apps/api/src/middleware/error.ts` via Hono's `app.onError`.
 
-## Allowed window hours
+## Window hours validation
 
-`REVIEW_WINDOW_HOURS_ALLOWED` / `REVIEW_WINDOW_HOURS_DEFAULT` default to `48,168,720` (2 / 7 / 30 days) and `48`. The API composition root reads these and builds the validation schema via `makeReviewsQuerySchema(...)`, so the env vars genuinely drive what the server accepts (any value outside the set → `400`). The frontend's window picker mirrors the default allow-list (`ALLOWED_WINDOW_HOURS` in `@runway/shared`). The default `windowHours=48` returns an empty list for apps whose newest review is older than two days — use `168` or `720` for those.
+`windowHours` is validated as any integer in **[1, 720]**. The default is `48` (configurable via `REVIEW_WINDOW_HOURS_DEFAULT`). The API composition root builds the validation schema via `makeReviewsQuerySchema(env.REVIEW_WINDOW_HOURS_DEFAULT)` from `@packages/shared`. Values outside the range return `400 VALIDATION`.
+
+The frontend's `WindowPicker` offers **48h / 7d / 30d** as convenience presets (a local FE constant), but the API accepts any integer in range. The default `windowHours=48` returns an empty list for apps whose newest review is older than two days — use `168` or `720` for those.
 
 See [`docs/architecture.md`](architecture.md) for the composition root and [`docs/frontend.md`](frontend.md) for the matching client-side types.

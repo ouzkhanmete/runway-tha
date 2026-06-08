@@ -22,7 +22,7 @@ The system follows **clean architecture**: dependencies point inward. Outer laye
 ┌──────────────────────▼──────────────────────────────────┐
 │  Infrastructure  (packages/core/src/infrastructure/)    │
 │  DrizzleAppRepository, DrizzleReviewRepository,         │
-│  DrizzleSyncRunRepository, AppStoreFeedClient           │
+│  DrizzleSyncRunRepository, AppleRssApiClient            │
 │  DB: drizzle-orm/bun-sql (Bun-native SQL driver)        │
 └──────────────────────┬──────────────────────────────────┘
                        │ operates on
@@ -35,6 +35,20 @@ The system follows **clean architecture**: dependencies point inward. Outer laye
 
 **Dependency rule:** domain has no external deps; application depends only on domain types and port interfaces; infrastructure implements those interfaces; presentation calls application services.
 
+## Path-alias scheme
+
+TypeScript paths are declared in `tsconfig.base.json`:
+
+| Alias | Resolves to |
+|---|---|
+| `@packages/shared/*` | `packages/shared/src/*` |
+| `@packages/core/*` | `packages/core/src/*` |
+| `@apps/api/*` | `apps/api/src/*` |
+| `@apps/worker/*` | `apps/worker/src/*` |
+| `@apps/web/*` | `apps/web/src/*` |
+
+Public package APIs are imported as `@packages/core/index` and `@packages/shared/index`. Deep imports use the full path, e.g. `@packages/core/domain/app`, `@packages/core/application/repositories/app.repository`.
+
 ## Package boundaries
 
 ### `packages/shared` — isomorphic
@@ -46,7 +60,8 @@ Used by all three apps and safe to import in the browser.
 | `ReviewDtoSchema`, `ReviewDto` | Zod schema + inferred type for a review response |
 | `AppDtoSchema`, `AppDto` | Schema + type for an app response |
 | `RegisterAppRequestSchema` | POST /apps request validation |
-| `ReviewsQuerySchema`, `ALLOWED_WINDOW_HOURS` | Query-param validation and allowed windows |
+| `makeReviewsQuerySchema`, `ReviewsQuerySchema` | Query-param validation (any int 1–720, default 48) |
+| `Country` | Full ISO 3166-1 alpha-2 enum (lowercase values) for storefront selection |
 | `ApiErrorSchema`, `ApiError` | Error envelope schema |
 
 ### `packages/core` — server-only
@@ -56,9 +71,12 @@ Never imported by `apps/web`. Exports everything needed by `apps/api` and `apps/
 | Sub-path | Contents |
 |---|---|
 | `src/domain/` | Plain TypeScript types; zero runtime dependencies |
-| `src/application/ports/` | TypeScript interfaces (ports) |
+| `src/application/repositories/` | Repository port interfaces (`AppRepository`, `ReviewRepository`, `SyncRunRepository`) |
+| `src/application/api-clients/` | Feed client port interface (`ReviewFeedClient`) |
 | `src/application/services/` | Use-case classes; depend only on port interfaces |
-| `src/infrastructure/` | Concrete adapters (Drizzle repos, feed client, DB client, config) |
+| `src/infrastructure/repositories/` | Drizzle repo implementations + `createRepositories(db)` factory |
+| `src/infrastructure/api-clients/` | `AppleRssApiClient` (implements `ReviewFeedClient`), mapper, types |
+| `src/infrastructure/db/` | DB client, schema, migrations |
 | `src/config/env.ts` | `loadEnv()` — Zod-validated environment config with defaults |
 
 ## Composition roots
@@ -69,25 +87,24 @@ Each runnable app builds its own object graph in a `composition-root.ts`, then e
 
 ```
 createDb(url)
-  → DrizzleAppRepository
-  → DrizzleReviewRepository
+  → createRepositories(db)  ← { reviews, apps, syncRuns }
   → ReviewQueryService({ reviews })
   → AppRegistryService({ apps })
-  → createApp({ reviewQuery, registry })  ← Hono app
+  → makeReviewsQuerySchema(defaultHours)
+  → createApp({ reviewQuery, registry, reviewsQuerySchema })  ← Hono app
 ```
 
 ### `apps/worker` composition root
 
 ```
 createDb(url)
-  → DrizzleAppRepository
-  → DrizzleReviewRepository
-  → DrizzleSyncRunRepository
-  → AppStoreFeedClient({ fetch, baseUrl, maxPages, maxRetries })
+  → createRepositories(db)  ← { reviews, apps, syncRuns }
+  → AppleRssApiClient({ fetch, baseUrl, maxPages, maxRetries })
   → IngestReviewsService({ feed, reviews, syncRuns })
-  → SyncSchedulerService({ apps, ingest, stalenessMin, concurrency })
-  → AppRegistryService({ apps })  ← used only for seed-on-startup
+  → SyncSchedulerService({ apps, ingest, stalenessMs, concurrency })
 ```
+
+The worker has no startup seeding. Apps are registered via `POST /apps` or the web UI; the worker discovers them on the next tick.
 
 ## Key invariants
 

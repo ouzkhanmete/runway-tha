@@ -30,7 +30,7 @@ Services and their startup order:
 ```
 postgres (healthy)
   └── migrate (runs once, exits 0)
-        ├── worker (long-running; seeds 595068606 on start)
+        ├── worker (long-running; polls apps table)
         └── api   (long-running; published on host port 3001)
               └── web (vite preview; published on host port 5173)
 ```
@@ -38,20 +38,20 @@ postgres (healthy)
 | Service | Image | Host port | Notes |
 |---|---|---|---|
 | `postgres` | `postgres:18` | `5434` | Separate volume from dev DB |
-| `migrate` | monorepo Dockerfile | — | Runs `bun run --cwd packages/core migrate`; exits after completion |
-| `worker` | monorepo Dockerfile | — | `bun run --cwd apps/worker start`; seeds app `595068606` |
-| `api` | monorepo Dockerfile | `3001` | `bun run --cwd apps/api start`; internal port `3000` |
-| `web` | `web.Dockerfile` | `5173` | Vite preview (pre-built); proxies `/api` to `http://api:3000` |
+| `migrate` | `backend.Dockerfile` | — | Runs `bun run --cwd packages/core migrate`; exits after completion |
+| `worker` | `backend.Dockerfile` | — | `bun run --cwd apps/worker start`; polls `apps` table — no seeding |
+| `api` | `backend.Dockerfile` | `3001` | `bun run --cwd apps/api start`; internal port `3000` |
+| `web` | `frontend.Dockerfile` | `5173` | Vite preview (pre-built); proxies `/api` to `http://api:3000` |
 
-**API proxy in the web container:** `web.Dockerfile` builds the Vite app (`vite build`), then starts `vite preview` which forwards `/api` requests to the `API_PROXY_TARGET` environment variable (`http://api:3000`). This mirrors the dev-time Vite proxy.
+**API proxy in the web container:** `frontend.Dockerfile` builds the Vite app (`vite build`), then starts `vite preview` which forwards `/api` requests to the `API_PROXY_TARGET` environment variable (`http://api:3000`). This mirrors the dev-time Vite proxy.
 
 ## Dockerfiles
 
-### `docker/Dockerfile`
+### `docker/backend.Dockerfile`
 
 Used for `migrate`, `worker`, and `api` services. Copies the full monorepo, runs `bun install --frozen-lockfile`. The service command is passed in the compose file, so this is a general-purpose monorepo image.
 
-### `docker/web.Dockerfile`
+### `docker/frontend.Dockerfile`
 
 Extends the same base pattern, additionally runs `vite build` at image-build time, then starts `vite preview` as the default command.
 

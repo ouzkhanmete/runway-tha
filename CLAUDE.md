@@ -49,7 +49,7 @@ The full design spec lives at `docs/superpowers/specs/2026-06-08-app-store-revie
 
 - **Commits:** Conventional Commits, **no scope** — `feat: …`, `fix: …`, `chore: …`, `docs: …`, `test: …`, `refactor: …`. Commit straight to `main`.
 - **Per turn:** append an entry to `INTERACTION.md` (the prompt + a summary of changes) and make one commit.
-- **Tests:** Bun's native test runner. Repositories are always tested against a **real dockerized Postgres** (test compose, separate port).
+- **Tests:** Bun's native test runner. Unit and integration tests are **colocated** with the code they test under `src/` (e.g. `foo.service.test.ts` beside `foo.service.ts`). Only e2e tests live under `test/e2e/`. Repositories are always tested against a **real dockerized Postgres** (test compose, separate port).
 - **Validation:** Zod DTOs at the API boundary; schemas live in `packages/shared` and are reused by the FE.
 - **Don't commit** `docs/superpowers/` (git-ignored) or `.env`.
 
@@ -79,13 +79,20 @@ bun run dev:api        # Start the Hono API on :3000 (watches for changes)
 bun run dev:web        # Start the Vite dev server on :5173
 ```
 
-The worker registers the seed app (`595068606`) and begins ingesting on startup. The Vite dev server proxies `/api` to `localhost:3000`.
+There is no seed step — register an app via the web UI (http://localhost:5173) or `POST /apps` (e.g. App Store ID `595068606`), then the worker picks it up on its next tick. The Vite dev server proxies `/api` to `localhost:3000`.
 
 ### Tests
 
 ```sh
 bun run db:test:up     # Start test DB first (only needed once per session)
-bun test               # Run all 80 tests (unit + integration + e2e)
+bun test               # Run all 82 tests (unit + integration + e2e)
+```
+
+### Formatting
+
+```sh
+bun run format         # Biome: format + organise imports (write mode)
+bun run format:check   # Biome: check only (CI-safe)
 ```
 
 ### Full stack (Docker only — no local tooling required)

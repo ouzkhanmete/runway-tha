@@ -13,12 +13,14 @@ Key design decisions and dependency justifications.
 | **TanStack Query** | Minimal but complete server-state layer: caching, loading/error states, query key invalidation after mutations. Avoids hand-rolling `useEffect`+`useState` fetch logic. |
 | **React + Vite** | Standard SPA toolchain. Vite's built-in dev proxy eliminates any CORS configuration for local development. |
 | `fetch` (runtime built-in) | No HTTP library added. Bun's `fetch` is spec-compliant and available globally; the feed client and API client both accept an injectable `fetch` parameter for testability. |
+| **date-fns** | Date parsing, formatting, and arithmetic (`parseISO`, `formatISO`, `subHours`, `subMilliseconds`, `formatDistanceToNow`) with explicit, readable call sites instead of raw `Date` arithmetic. |
+| **Biome** | All-in-one formatter and import organiser (replaces ESLint + Prettier). Run via `bun run format`. Used solely for readability and consistency; no lint rules are enforced in CI. |
 
 ## Design decisions
 
 ### Configurable review window (default 48h)
 
-The API and frontend default to a 48h window because the primary use-case is monitoring recent reviews. A narrow default prevents unbounded query results on apps with large review history. The window is configurable (`48`, `168`, `720` hours) so users can look back further when needed.
+The API and frontend default to a 48h window because the primary use-case is monitoring recent reviews. A narrow default prevents unbounded query results on apps with large review history. The window is any integer in **[1, 720]** hours, so users can look back as far as needed (up to the 30-day / 500-review limit of the Apple RSS feed). The frontend's `WindowPicker` offers **48h / 7d / 30d** as convenience presets, but the API accepts any value in range.
 
 Apple's RSS feed only provides the ~500 most-recent reviews, so the local DB will not contain older reviews unless they happen to fall within a fetch window — which is why 48h may return zero results for apps with low velocity and is entirely expected.
 

@@ -29,7 +29,9 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 | `submitted_at` | `timestamptz` NOT NULL | From RSS `updated` field (ISO+TZ) |
 | `fetched_at` | `timestamptz` NOT NULL default `now()` | When the row was (last) upserted |
 
-**Index:** `reviews_app_submitted_idx ON (app_id, submitted_at DESC)` — covers both the `WHERE app_id = ?` filter and the `ORDER BY submitted_at DESC` ordering used by `findRecent`.
+**Indexes:**
+- `reviews (app_id, submitted_at DESC)` — covers the `WHERE app_id = ?` filter and `ORDER BY submitted_at DESC` ordering used by `findRecent`.
+- `reviews.id` PRIMARY KEY — the unique index that the idempotent `ON CONFLICT (id) DO UPDATE` upsert relies on.
 
 ### `sync_runs` — audit log and staleness signal
 
@@ -43,6 +45,8 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 | `pages_fetched` | `integer` NOT NULL default `0` | |
 | `reviews_upserted` | `integer` NOT NULL default `0` | |
 | `error` | `text` nullable | Error message on failure |
+
+**Index:** `sync_runs (app_id, status, finished_at)` — serves the worker's `findDueForSync` staleness query (filters by `app_id`, `status = 'success'`, and `finished_at`).
 
 `sync_runs` serves two roles simultaneously:
 
@@ -58,5 +62,13 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 - The only persistent state that changes across a re-run is `fetched_at` (refreshed to `now()` on re-upsert), which is not used for querying.
 
 `apps` are inserted with `onConflictDoNothing`, making `POST /apps` also idempotent.
+
+## Country enum
+
+The `country` column stays `text` in the database. The repository maps it to/from the `Country` enum (`@packages/shared/enums/country`) which contains the full set of ISO 3166-1 alpha-2 codes as lowercase values (e.g. `Country.US = "us"`). This prevents magic strings in the application layer.
+
+## Idempotent init migration
+
+The initial migration uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` so it can be re-run safely. Foreign-key constraints use a `DO $$ … EXCEPTION WHEN duplicate_object THEN NULL; END $$` guard for the same reason.
 
 See [`docs/etl.md`](etl.md) for how `sync_runs` drives the worker scheduling loop.

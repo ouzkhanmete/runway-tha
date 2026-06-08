@@ -51,12 +51,12 @@ bun run db:up
 bun run migrate
 
 # 4. Start the worker, API, and web app (each in a separate terminal)
-bun run dev:worker   # registers the sample app and begins ingesting
+bun run dev:worker   # ETL poller — polls the apps table each tick
 bun run dev:api      # Hono API on :3000
 bun run dev:web      # React UI on :5173 (proxies /api to :3000)
 ```
 
-Open http://localhost:5173. The worker ingests on startup — if no reviews appear in the default 48h window, use the **7d** or **30d** picker (apps like the sample `595068606` may have review gaps longer than 48h).
+Open http://localhost:5173. **Add an app** using the "Add app" form (enter an App Store ID, e.g. `595068606`) or `POST /apps`. The worker ingests it on its next tick (within 60 s by default). If no reviews appear in the default 48h window, use the **7d** or **30d** picker — apps like `595068606` may have review gaps longer than 48h. The API accepts any window from 1–720 hours.
 
 ### Option B — one-command full stack (Docker only)
 
@@ -67,9 +67,9 @@ docker compose -f docker/docker-compose.full.yml up --build
 - Web UI: http://localhost:5173
 - API: http://localhost:3001
 - The `migrate` service runs automatically before the worker and API start.
-- The worker seeds app `595068606` and starts ingesting immediately.
+- The worker starts polling immediately — open http://localhost:5173, add an App Store ID (e.g. `595068606`) via the form or `POST /apps`, and the worker ingests it within one tick.
 
-> If the 48h window shows no reviews, switch to **7d** or **30d** — the sample app's most recent review may be several days old.
+> If the 48h window shows no reviews, switch to **7d** or **30d** — the app's most recent review may be several days old. The API also accepts any window from 1–720 hours.
 
 ## Status
 

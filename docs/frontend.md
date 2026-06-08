@@ -23,7 +23,7 @@ apps/web/src/
 
 ## API client (`api/client.ts`)
 
-`createApiClient()` returns three methods, each Zod-parsing the response against the schemas from `@runway/shared`:
+`createApiClient()` returns three methods, each Zod-parsing the response against the schemas from `@packages/shared`:
 
 | Method | Endpoint | Returns |
 |---|---|---|
@@ -60,7 +60,7 @@ Text input + submit button. Calls `useRegisterApp` with the trimmed input value.
 
 ### `WindowPicker`
 
-Three toggle buttons: **48h** (48 hours), **7d** (168 hours), **30d** (720 hours). Values match the allowed set enforced by the API. Selecting a different window triggers a new query via the `windowHours` key change in `useReviews`.
+Three toggle buttons: **48h** (48 hours), **7d** (168 hours), **30d** (720 hours). These are convenience presets defined as a local FE constant; the API accepts any integer in [1, 720]. Selecting a different window triggers a new query via the `windowHours` key change in `useReviews`.
 
 ### `ReviewCard`
 
@@ -88,4 +88,4 @@ In the full Docker stack (`docker-compose.full.yml`), the web container runs `vi
 
 The default `windowHours=48` is intentional: it surfaces only very recent reviews, which is the typical monitoring use-case. For apps with lower review velocity (e.g. the sample app `595068606`) the 48h window will frequently return zero results. The empty state copy explicitly tells users to try the 7d or 30d windows.
 
-See [`docs/api.md`](api.md) for the allowed window values and server-side validation.
+See [`docs/api.md`](api.md) for the window range and server-side validation.
