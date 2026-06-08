@@ -26,7 +26,7 @@ export function AppSelector({ apps, value, onChange }: AppSelectorProps) {
       >
         {apps.map((app) => (
           <option key={app.id} value={app.id}>
-            {app.name ?? app.id} ({app.country.toUpperCase()})
+            {app.name ?? app.id} ({app.country.toUpperCase()}){app.claimedAt ? " · syncing…" : ""}
           </option>
         ))}
       </select>

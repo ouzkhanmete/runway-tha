@@ -96,3 +96,17 @@ This file documents how the project was built with **Claude Code**. Each entry i
 **What changed:** the whole monorepo, restructured per the 14 items + 4 follow-ups, then **Biome-formatted**.
 
 **Verified live:** **82/82 tests green**, all five packages type-check clean; the **no-seeding flow** end-to-end (register via `POST /apps` → worker's tick ingests → 6 reviews newest-first); window now accepts **any 1–720** (200 ok, 721/0 → 400); the **dockerized full stack** (renamed Dockerfiles) served reviews through the web→api proxy (worker `processed: 1`). Committed in 9 conventional commits.
+
+---
+
+## Turn 6 — Worker hardening: no-overlap loop + multi-worker claim lease (2026-06-08)
+
+**Prompt:** improve the worker — (1) make sure `setInterval` ticks never overlap if one run becomes stale; (2) make it safe to run multiple workers by claiming an app with an atomic update+return in an isolated transaction (so two workers never pick the same id), with a "pending"-style status that still relies on a timestamp so a stuck claim is retried after N, for visibility into what's running now; (3) lower the check interval to 30 s for snappy demo pickup while keeping the 15 min cooldown.
+
+**What changed:**
+- **No overlap by construction** — replaced `setInterval` + re-entrancy guard with a **self-rescheduling `setTimeout`** loop (`apps/worker/src/scheduler-loop.ts`): the next tick is scheduled only after the current one settles. Added `scheduler-loop.test.ts` proving no two ticks run concurrently even when a tick outlasts the interval, and that `stop()` halts the loop.
+- **Atomic claim lease for multi-worker safety** — added an `apps.claimed_at` lease column (additive idempotent migration `0001`, `ADD COLUMN IF NOT EXISTS`). `findDueForSync` became **`claimDueForSync`**: a single `UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED) … RETURNING` statement that claims due apps and stamps `claimed_at`, so concurrent workers never grab the same app. `SKIP LOCKED` covers the simultaneous window; the `claimed_at` timestamp covers the after-commit window. Added `releaseClaim`; the scheduler releases the lease in a `finally` after each app (success **or** error), and a claim older than `WORKER_CLAIM_TTL_MS` (new env, default 5 min) is reclaimed as stuck (crash recovery). Surfaced `claimedAt` on `AppDto` + a "syncing…" hint in the web app selector for visibility.
+- **Demo cadence** — `WORKER_TICK_MS` default/`.env`/compose → **30 s**; `WORKER_STALENESS_MS` stays **15 min**. New apps are discovered within 30 s; an already-synced app isn't re-fetched until the cooldown elapses.
+- **Docs** — `etl.md` (new "Multi-worker safety: the claim lease" section + self-scheduling loop + config table), `data-model.md` (`claimed_at`, index rationale, additive idempotent migration), `api.md` (`claimedAt` on `AppDto`), `decisions.md` (DB claim over an external queue), `testing.md` + `CLAUDE.md` invariants + test count → **89**.
+
+**Verified live:** **89/89 tests green** (incl. a real-Postgres integration test asserting two concurrent claims never grab the same app, and the back-to-back no-overlap loop test); all five packages type-check clean; migration `0001` applied to the dev DB and confirmed re-runnable; a one-shot live tick against the real Apple feed ran **claim → ingest (10 pages / ~450 reviews) → release**, leaving `claimed_at` back to `NULL`. Biome-formatted.

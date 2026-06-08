@@ -4,6 +4,10 @@ export const apps = pgTable("apps", {
   name: text("name"),
   country: text("country").notNull().default("us"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  // Worker claim lease: NULL = not claimed. A worker stamps this when it claims the
+  // app for a sync; it is cleared on finish. A claim older than WORKER_CLAIM_TTL_MS is
+  // treated as stuck (crashed worker) and may be reclaimed. See claimDueForSync.
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
 });
 export const reviews = pgTable(
   "reviews",

@@ -5,4 +5,6 @@ export interface App {
   name: string | null;
   country: Country;
   createdAt: Date;
+  // When non-null and recent, a worker is currently syncing this app (the claim lease).
+  claimedAt: Date | null;
 }

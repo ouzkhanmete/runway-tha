@@ -27,6 +27,7 @@ Clean-architecture layering; dependencies point inward. Outer layers depend on *
 - Reviews are **upserted by stable RSS review `id`** → ingestion is idempotent → safe stop/restart (no cursor needed for correctness).
 - The **worker is the only writer of `reviews`**; the API only reads reviews and writes the `apps` row on registration.
 - The worker is **table-driven**: each tick it reads `apps ⨝ sync_runs` and processes apps with no successful run inside the staleness window. Onboarding an app = one insert.
+- The worker is **safe to run as multiple instances**: each tick **atomically claims** its apps via `UPDATE … FOR UPDATE SKIP LOCKED` (stamping `apps.claimed_at`), so two workers never process the same app. The lease is released on finish and reclaimable after `WORKER_CLAIM_TTL_MS` if a worker crashes. The scheduler loop is a self-rescheduling `setTimeout`, so ticks never overlap.
 
 ## Documentation map
 
@@ -85,7 +86,7 @@ There is no seed step — register an app via the web UI (http://localhost:5173)
 
 ```sh
 bun run db:test:up     # Start test DB first (only needed once per session)
-bun test               # Run all 82 tests (unit + integration + e2e)
+bun test               # Run all 89 tests (unit + integration + e2e)
 ```
 
 ### Formatting

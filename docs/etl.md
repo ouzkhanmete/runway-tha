@@ -40,28 +40,58 @@ GET https://itunes.apple.com/{country}/rss/customerreviews/id={appId}/sortBy=mos
 
 | Var | Default | Meaning |
 |---|---|---|
-| `WORKER_TICK_MS` | `60000` | Interval between scheduler ticks (ms) |
-| `WORKER_STALENESS_MS` | `900000` | Minimum milliseconds since last successful sync before an app is re-queued (default 15 min) |
+| `WORKER_TICK_MS` | `30000` | Gap between scheduler ticks (ms). Lowered to 30 s so a newly-registered app is picked up quickly in the demo. |
+| `WORKER_STALENESS_MS` | `900000` | Minimum milliseconds since last successful sync before an app is re-queued (the cooldown, default 15 min) |
+| `WORKER_CLAIM_TTL_MS` | `300000` | How long a claim lease is honored before it is treated as stuck (crashed worker) and may be reclaimed (default 5 min) |
 | `WORKER_MAX_PAGES` | `10` | Maximum pages fetched per app per sync |
 | `WORKER_CONCURRENCY` | `3` | Max apps synced in parallel per tick |
 | `WORKER_MAX_RETRIES` | `3` | Per-page HTTP retry attempts |
 | `FEED_BASE_URL` | `https://itunes.apple.com` | Base URL for the RSS feed |
 
-### Tick cycle
+Note that `WORKER_TICK_MS` (how often we *look* for work) is independent of `WORKER_STALENESS_MS` (how often a given app is actually *re-synced*). A 30 s tick with a 15 min cooldown means new apps are discovered within 30 s, but an already-synced app is not re-fetched until 15 min have passed.
 
-`startLoop` fires immediately on startup, then repeats every `WORKER_TICK_MS`. Each tick skips if the previous run is still in progress (no overlapping executions).
+### Tick cycle — no overlap by construction
+
+`startLoop` uses a **self-rescheduling `setTimeout`**, not `setInterval`: the next tick is scheduled only *after* the current one fully settles (`apps/worker/src/scheduler-loop.ts`). A slow or stalled tick therefore delays the next one instead of stacking up behind it — overlapping runs are impossible by construction, and the gap between runs is always `WORKER_TICK_MS`.
 
 Within each tick, `SyncSchedulerService.runDueOnce()`:
 
-1. Computes `staleBefore = now() − WORKER_STALENESS_MS`.
-2. Calls `AppRepository.findDueForSync(staleBefore)` → apps with no successful `sync_run` with `finished_at > staleBefore`.
-3. Processes due apps in parallel up to `WORKER_CONCURRENCY` using `mapWithConcurrency`.
+1. Computes `staleBefore = now() − WORKER_STALENESS_MS` and `claimExpiredBefore = now() − WORKER_CLAIM_TTL_MS`.
+2. Calls `AppRepository.claimDueForSync(...)` — a single atomic statement that **claims** the due apps (see [Multi-worker safety](#multi-worker-safety-the-claim-lease) below) and stamps each with `claimed_at = now()`.
+3. Processes claimed apps in parallel up to `WORKER_CONCURRENCY` using `mapWithConcurrency`.
 4. For each app, `IngestReviewsService.ingestApp(app)`:
    - Opens a `sync_run` record (`syncRuns.start`).
    - Calls `AppleRssApiClient.fetchAllPages` — always fetches pages 1–10 (stops early only if a page returns 0 entries).
    - Upserts all collected reviews (`reviewRepo.upsertMany`).
    - Closes the `sync_run` with `status: "success"` and counts, or `status: "error"` with the error message. The run record is always closed, even on failure.
-5. A failed app increments `failed` but does not stop other apps from being processed.
+5. After each app finishes (success **or** error), the scheduler calls `AppRepository.releaseClaim(app.id)` to clear the lease. A failed app increments `failed` but does not stop other apps from being processed.
+
+### Multi-worker safety: the claim lease
+
+The worker is safe to run as **multiple concurrent instances** (e.g. for throughput or rolling restarts). Two workers ticking at the same time must never both process the same app — that would mean duplicate feed fetches and racing `sync_run` rows. Idempotent upserts keep the *data* correct either way, but we avoid the wasted work entirely with a database-enforced claim.
+
+`apps.claimed_at` is a **lease column**. The claim is one atomic statement:
+
+```sql
+UPDATE apps SET claimed_at = now()
+FROM (
+  SELECT a.id FROM apps a
+  WHERE NOT EXISTS (                       -- cooldown: no successful run within the window
+          SELECT 1 FROM sync_runs s
+          WHERE s.app_id = a.id AND s.status = 'success' AND s.finished_at > :staleBefore)
+    AND (a.claimed_at IS NULL OR a.claimed_at < :claimExpiredBefore)  -- free, or a stuck lease
+  FOR UPDATE SKIP LOCKED                    -- concurrent claims skip rows already locked
+) AS due
+WHERE apps.id = due.id
+RETURNING apps.*;
+```
+
+Two mechanisms combine to guarantee single-ownership:
+
+- **`FOR UPDATE SKIP LOCKED`** handles the *simultaneous* window: whichever worker reaches a row first row-locks it; a concurrent worker's identical statement skips the locked row rather than blocking.
+- **`claimed_at`** handles the *after-commit* window: once a worker has stamped a fresh `claimed_at`, the `claimed_at IS NULL OR claimed_at < claimExpiredBefore` predicate excludes that app from any later claim until the cooldown elapses.
+
+The lease is released (`claimed_at → NULL`) when the sync finishes. If a worker **crashes** mid-sync, the lease is never released — but it becomes reclaimable once it is older than `WORKER_CLAIM_TTL_MS`, so a stuck app self-heals on a later tick. `claimed_at` is also surfaced on `AppDto` (and the web app selector shows "syncing…") purely for visibility into which apps are being processed right now; correctness relies on the timestamp, not on that label.
 
 ### Why always-10-pages?
 
@@ -97,4 +127,4 @@ Apple's RSS endpoint has no published rate limits and returns no `X-RateLimit-*`
 
 Bounded concurrency (`WORKER_CONCURRENCY=3`) and per-request backoff/retry are present as good-citizenship safeguards regardless.
 
-See [`docs/data-model.md`](data-model.md) for the schema that drives `findDueForSync`.
+See [`docs/data-model.md`](data-model.md) for the schema that drives `claimDueForSync`.

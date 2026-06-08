@@ -7,6 +7,8 @@ interface SyncSchedulerDeps {
   apps: AppRepository;
   ingest: IngestReviewsService;
   stalenessMs: number;
+  /** A claim older than this is treated as stuck (crashed worker) and may be reclaimed. */
+  claimTtlMs: number;
   concurrency: number;
   clock?: () => Date;
 }
@@ -17,15 +19,26 @@ export class SyncSchedulerService {
   async runDueOnce(): Promise<{ processed: number; failed: number }> {
     const now = (this.deps.clock ?? (() => new Date()))();
     const staleBefore = subMilliseconds(now, this.deps.stalenessMs);
-    const due = await this.deps.apps.findDueForSync(staleBefore);
+    const claimExpiredBefore = subMilliseconds(now, this.deps.claimTtlMs);
+    // Atomically claim the due apps. With multiple workers running, each app is handed
+    // to exactly one of them — the claim is a single locked UPDATE inside the repo.
+    const claimed = await this.deps.apps.claimDueForSync({
+      staleBefore,
+      claimExpiredBefore,
+      claimedAt: now,
+    });
     let failed = 0;
-    await mapWithConcurrency(due, this.deps.concurrency, async (app) => {
+    await mapWithConcurrency(claimed, this.deps.concurrency, async (app) => {
       try {
         await this.deps.ingest.ingestApp(app);
       } catch {
         failed++; // ingestApp already records an error sync_run
+      } finally {
+        // Release the lease regardless of outcome so visibility stays accurate. A failed
+        // release is non-fatal: the claim TTL will let another tick reclaim the app.
+        await this.deps.apps.releaseClaim(app.id).catch(() => {});
       }
     });
-    return { processed: due.length, failed };
+    return { processed: claimed.length, failed };
   }
 }

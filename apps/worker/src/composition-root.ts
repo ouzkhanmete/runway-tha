@@ -30,6 +30,7 @@ export function buildWorker() {
     apps: repos.apps,
     ingest,
     stalenessMs: env.WORKER_STALENESS_MS,
+    claimTtlMs: env.WORKER_CLAIM_TTL_MS,
     concurrency: env.WORKER_CONCURRENCY,
   });
 

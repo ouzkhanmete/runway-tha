@@ -6,6 +6,8 @@ export const AppDtoSchema = z.object({
   name: z.string().nullable(),
   country: z.string(),
   createdAt: z.string(),
+  // ISO timestamp while a worker is currently syncing this app, else null. Visibility only.
+  claimedAt: z.string().nullable(),
 });
 export type AppDto = z.infer<typeof AppDtoSchema>;
 

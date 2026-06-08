@@ -1,6 +1,6 @@
 # Testing
 
-All tests use Bun's native test runner (`bun test`). **82 tests** across a three-level pyramid.
+All tests use Bun's native test runner (`bun test`). **89 tests** across a three-level pyramid.
 
 ## Test layout
 
@@ -10,14 +10,15 @@ Unit and integration tests are **colocated** next to the code they test under `s
 
 ### Unit tests — pure, no DB, no network
 
-Colocated in `packages/core/src/**/*.test.ts` and `packages/shared/src/**/*.test.ts`.
+Colocated in `packages/core/src/**/*.test.ts`, `packages/shared/src/**/*.test.ts`, and `apps/worker/src/**/*.test.ts`.
 
 | File | What is tested |
 |---|---|
 | `infrastructure/api-clients/apple-rss.mapper.test.ts` | `mapEntry` and `mapFeedPage`: metadata-entry filtering, field mapping, single-object edge case |
 | `application/services/ingest-reviews.service.test.ts` | `IngestReviewsService`: port calls, success/error sync_run recording, rethrow on failure |
 | `application/services/review-query.service.test.ts` | `ReviewQueryService`: `since` date computation, delegation to `findRecent`, injectable clock |
-| `application/services/sync-scheduler.service.test.ts` | `SyncSchedulerService`: staleness computation, per-app processing, partial-failure isolation |
+| `application/services/sync-scheduler.service.test.ts` | `SyncSchedulerService`: staleness + claim-TTL computation, per-app processing, lease release on success **and** failure, partial-failure isolation |
+| `apps/worker/src/scheduler-loop.test.ts` | `startLoop`: no overlapping ticks even when a tick outlasts the interval; `stop()` halts further ticks |
 | `packages/shared/src/dto/dto.test.ts` | All shared Zod schemas: valid parses, rejections, defaults, coercion |
 
 Dependencies are replaced with inline fake objects (no mock library).
@@ -29,7 +30,7 @@ Repository tests are colocated in `packages/core/src/infrastructure/repositories
 | File | What is tested |
 |---|---|
 | `test/int/harness.smoke.test.ts` | Migrations apply and `truncateAll` works |
-| `infrastructure/repositories/app.repository.test.ts` | `DrizzleAppRepository`: create (idempotent), findById, list, `findDueForSync` (all 4 staleness cases) |
+| `infrastructure/repositories/app.repository.test.ts` | `DrizzleAppRepository`: create (idempotent), findById, list, `claimDueForSync` (4 staleness cases + lease stamping, skip-already-claimed, reclaim-stuck-lease, **two concurrent claims never grab the same app**), `releaseClaim` |
 | `infrastructure/repositories/review.repository.test.ts` | `DrizzleReviewRepository`: upsertMany (insert, idempotent upsert, content update, empty array), `findRecent` (filter by window, ordering, type coercions) |
 | `infrastructure/api-clients/apple-rss.api-client.test.ts` | `AppleRssApiClient` with mocked `fetch`: URL construction, page aggregation, early-stop on empty page, retry on 429/403/5xx, throw after maxRetries |
 

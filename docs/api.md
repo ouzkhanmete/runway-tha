@@ -59,8 +59,16 @@ All schemas live in `packages/shared/src/dto/` and are shared with the frontend.
 ### `AppDto`
 
 ```ts
-{ id: string; name: string | null; country: string; createdAt: string }
+{
+  id: string;
+  name: string | null;
+  country: string;
+  createdAt: string;
+  claimedAt: string | null;  // ISO timestamp while a worker is currently syncing this app, else null
+}
 ```
+
+`claimedAt` mirrors the worker's claim lease (`apps.claimed_at`) — non-null means a worker is processing this app right now. It is informational only (the web app selector shows a "syncing…" hint); see [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease).
 
 ### `ReviewDto`
 

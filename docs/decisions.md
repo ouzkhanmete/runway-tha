@@ -34,7 +34,11 @@ The API and worker share the same Postgres instance but have strict role separat
 
 ### Table-driven worker onboarding
 
-Adding a new app to track requires only one INSERT (via `POST /apps`). The worker's `findDueForSync` query discovers it automatically on the next tick without any configuration reload or restart. This is the table-driven pattern: the database is the source of truth for which apps to process.
+Adding a new app to track requires only one INSERT (via `POST /apps`). The worker's `claimDueForSync` query discovers it automatically on the next tick without any configuration reload or restart. This is the table-driven pattern: the database is the source of truth for which apps to process.
+
+### Database-enforced claim over an external queue
+
+The worker uses a Postgres claim (`apps.claimed_at` + `UPDATE … FOR UPDATE SKIP LOCKED`) to coordinate multiple instances, rather than introducing a job queue (Redis/SQS/etc.). Rationale: the database is already the source of truth and is already a dependency, the work-set is small (one row per tracked app), and `SKIP LOCKED` is the canonical, well-understood Postgres idiom for exactly-once-ish job claiming. This keeps the system single-dependency and the claim logic colocated with the data it guards. The lease is advisory for *efficiency* (avoiding duplicate fetches); idempotent upserts mean *correctness* never depends on it. A dedicated queue would add operational surface for no benefit at this scale. See [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease).
 
 ### Bun-native SQL driver over `pg`
 

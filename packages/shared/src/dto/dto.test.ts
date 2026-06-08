@@ -68,7 +68,24 @@ test("makeReviewsQuerySchema honors a custom default", () => {
 });
 
 test("AppDtoSchema parses", () => {
-  expect(AppDtoSchema.parse({ id: "1", name: null, country: "us", createdAt: "x" }).country).toBe(
-    "us",
-  );
+  const dto = AppDtoSchema.parse({
+    id: "1",
+    name: null,
+    country: "us",
+    createdAt: "x",
+    claimedAt: null,
+  });
+  expect(dto.country).toBe("us");
+  expect(dto.claimedAt).toBeNull();
+});
+
+test("AppDtoSchema carries claimedAt when an app is being synced", () => {
+  const dto = AppDtoSchema.parse({
+    id: "1",
+    name: null,
+    country: "us",
+    createdAt: "x",
+    claimedAt: "2026-06-08T12:00:00Z",
+  });
+  expect(dto.claimedAt).toBe("2026-06-08T12:00:00Z");
 });

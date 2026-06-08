@@ -21,5 +21,6 @@ export function toAppDto(a: App): AppDto {
     name: a.name,
     country: a.country,
     createdAt: formatISO(a.createdAt),
+    claimedAt: a.claimedAt ? formatISO(a.claimedAt) : null,
   };
 }

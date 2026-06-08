@@ -12,8 +12,11 @@ Three tables. All timestamps are `timestamptz`. Schema lives in `packages/core/s
 | `name` | `text` nullable | Not populated — name enrichment is deferred |
 | `country` | `text` NOT NULL default `us` | Two-letter ISO country code |
 | `created_at` | `timestamptz` NOT NULL default `now()` | Registration time |
+| `claimed_at` | `timestamptz` nullable | Worker claim lease — set while a worker is syncing this app, cleared on finish. See below. |
 
-Inserting a row here is the complete act of onboarding an app. The worker self-discovers it on the next tick via `findDueForSync`.
+Inserting a row here is the complete act of onboarding an app. The worker self-discovers it on the next tick via `claimDueForSync`.
+
+**`claimed_at` (claim lease).** When multiple workers run, each tick atomically *claims* the apps it will process by stamping `claimed_at`, so two workers never pick the same app. The claim is a single `UPDATE … FROM (SELECT … FOR UPDATE SKIP LOCKED) … RETURNING` statement; the lease is cleared on finish and is reclaimable if older than `WORKER_CLAIM_TTL_MS` (a crashed worker). It is also surfaced on `AppDto` for "who's syncing now" visibility. Full rationale in [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease). No index is added on `apps.claimed_at`: the registry is small (one row per tracked app), so the claim's sequential scan over `apps` is already optimal; the predicate's cost lives in the `sync_runs` NOT EXISTS subquery, which the index below serves.
 
 ### `reviews` — review storage
 
@@ -46,12 +49,12 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 | `reviews_upserted` | `integer` NOT NULL default `0` | |
 | `error` | `text` nullable | Error message on failure |
 
-**Index:** `sync_runs (app_id, status, finished_at)` — serves the worker's `findDueForSync` staleness query (filters by `app_id`, `status = 'success'`, and `finished_at`).
+**Index:** `sync_runs (app_id, status, finished_at)` — serves the cooldown subquery inside `claimDueForSync` (filters by `app_id`, `status = 'success'`, and `finished_at`).
 
 `sync_runs` serves two roles simultaneously:
 
 1. **Audit log** — every fetch attempt is recorded with timing and counts.
-2. **Staleness signal** — `findDueForSync(staleBefore)` queries for apps that have _no_ successful run with `finished_at > staleBefore`. An error run does not satisfy this, so a previously-failed app remains eligible for retry on the next tick.
+2. **Staleness signal** — the cooldown subquery in `claimDueForSync` selects apps that have _no_ successful run with `finished_at > staleBefore`. An error run does not satisfy this, so a previously-failed app remains eligible for retry on the next tick.
 
 ## Restart-safety and idempotency
 
@@ -67,8 +70,8 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 
 The `country` column stays `text` in the database. The repository maps it to/from the `Country` enum (`@packages/shared/enums/country`) which contains the full set of ISO 3166-1 alpha-2 codes as lowercase values (e.g. `Country.US = "us"`). This prevents magic strings in the application layer.
 
-## Idempotent init migration
+## Idempotent migrations
 
-The initial migration uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` so it can be re-run safely. Foreign-key constraints use a `DO $$ … EXCEPTION WHEN duplicate_object THEN NULL; END $$` guard for the same reason.
+The initial migration (`0000_*`) uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` so it can be re-run safely; foreign-key constraints use a `DO $$ … EXCEPTION WHEN duplicate_object THEN NULL; END $$` guard for the same reason. Additive migrations follow the same discipline — `0001_*` adds `apps.claimed_at` with `ALTER TABLE … ADD COLUMN IF NOT EXISTS`. The Drizzle migrator also records applied migrations and never re-runs one, but the `IF [NOT] EXISTS` guards keep each statement safe to apply against a partially-migrated database by hand.
 
-See [`docs/etl.md`](etl.md) for how `sync_runs` drives the worker scheduling loop.
+See [`docs/etl.md`](etl.md) for how `sync_runs` and the `claimed_at` lease drive the worker scheduling loop.

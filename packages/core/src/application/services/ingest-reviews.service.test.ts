@@ -10,6 +10,7 @@ function makeApp(overrides: Partial<App> = {}): App {
     name: "TestApp",
     country: Country.US,
     createdAt: new Date(),
+    claimedAt: null,
     ...overrides,
   };
 }
