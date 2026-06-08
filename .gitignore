@@ -29,3 +29,6 @@ coverage/
 
 # Superpowers working artifacts (design specs / plans) — not part of the deliverable
 docs/superpowers/
+
+# Local Claude Code harness state
+.claude/
