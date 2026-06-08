@@ -36,6 +36,41 @@ packages/core     Server-only domain · use-cases · ports · Drizzle repos · f
 
 See [`CLAUDE.md`](./CLAUDE.md) for the documentation map, and [`docs/`](./docs) for subsystem write-ups.
 
+## Quick start
+
+### Option A — local dev (requires Bun and Docker)
+
+```sh
+# 1. Install dependencies
+bun install
+
+# 2. Start Postgres
+bun run db:up
+
+# 3. Apply migrations
+bun run migrate
+
+# 4. Start the worker, API, and web app (each in a separate terminal)
+bun run dev:worker   # registers the sample app and begins ingesting
+bun run dev:api      # Hono API on :3000
+bun run dev:web      # React UI on :5173 (proxies /api to :3000)
+```
+
+Open http://localhost:5173. The worker ingests on startup — if no reviews appear in the default 48h window, use the **7d** or **30d** picker (apps like the sample `595068606` may have review gaps longer than 48h).
+
+### Option B — one-command full stack (Docker only)
+
+```sh
+docker compose -f docker/docker-compose.full.yml up --build
+```
+
+- Web UI: http://localhost:5173
+- API: http://localhost:3001
+- The `migrate` service runs automatically before the worker and API start.
+- The worker seeds app `595068606` and starts ingesting immediately.
+
+> If the 48h window shows no reviews, switch to **7d** or **30d** — the sample app's most recent review may be several days old.
+
 ## Status
 
-🚧 Scaffolding in progress — see [`INTERACTION.md`](./INTERACTION.md). Run instructions land with the implementation.
+Implementation complete — see [`INTERACTION.md`](./INTERACTION.md) for the full build log.

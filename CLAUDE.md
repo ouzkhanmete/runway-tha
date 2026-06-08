@@ -34,14 +34,14 @@ Read the doc before working on the matching area. `✅` exists · `⏳` planned 
 
 | Doc | Read it when… | Status |
 |---|---|---|
-| `docs/architecture.md` | changing layering, DI/composition roots, package boundaries | ⏳ |
-| `docs/data-model.md` | touching the schema, migrations, or restart-safety/idempotency | ⏳ |
-| `docs/etl.md` | working on the worker, RSS parsing, pagination, rate limits, staleness | ⏳ |
-| `docs/api.md` | adding/altering API routes, DTOs, error handling | ⏳ |
-| `docs/frontend.md` | working on the web app, data fetching, components | ⏳ |
-| `docs/infra.md` | docker-compose, migrations, running things locally | ⏳ |
-| `docs/testing.md` | writing/running tests, understanding the test pyramid | ⏳ |
-| `docs/decisions.md` | questioning a tech choice or a 3rd-party dependency | ⏳ |
+| `docs/architecture.md` | changing layering, DI/composition roots, package boundaries | ✅ |
+| `docs/data-model.md` | touching the schema, migrations, or restart-safety/idempotency | ✅ |
+| `docs/etl.md` | working on the worker, RSS parsing, pagination, rate limits, staleness | ✅ |
+| `docs/api.md` | adding/altering API routes, DTOs, error handling | ✅ |
+| `docs/frontend.md` | working on the web app, data fetching, components | ✅ |
+| `docs/infra.md` | docker-compose, migrations, running things locally | ✅ |
+| `docs/testing.md` | writing/running tests, understanding the test pyramid | ✅ |
+| `docs/decisions.md` | questioning a tech choice or a 3rd-party dependency | ✅ |
 
 The full design spec lives at `docs/superpowers/specs/2026-06-08-app-store-reviews-viewer-design.md` (git-ignored working artifact).
 
@@ -55,4 +55,43 @@ The full design spec lives at `docs/superpowers/specs/2026-06-08-app-store-revie
 
 ## Commands
 
-_Populated as the tooling lands (Bun scripts for dev/test/migrate/compose)._
+### Database
+
+```sh
+bun run db:up          # Start local Postgres on :5432 (dev)
+bun run db:down        # Stop local Postgres
+bun run db:test:up     # Start test Postgres on :5433 (required before running tests)
+bun run db:test:down   # Stop test Postgres
+```
+
+### Migrations
+
+```sh
+bun run migrate        # Apply migrations to DATABASE_URL (default: local dev DB)
+bun run generate       # Regenerate migration files after schema changes
+```
+
+### Development (run each in a separate terminal)
+
+```sh
+bun run dev:worker     # Start the ETL worker (watches for changes)
+bun run dev:api        # Start the Hono API on :3000 (watches for changes)
+bun run dev:web        # Start the Vite dev server on :5173
+```
+
+The worker registers the seed app (`595068606`) and begins ingesting on startup. The Vite dev server proxies `/api` to `localhost:3000`.
+
+### Tests
+
+```sh
+bun run db:test:up     # Start test DB first (only needed once per session)
+bun test               # Run all 80 tests (unit + integration + e2e)
+```
+
+### Full stack (Docker only — no local tooling required)
+
+```sh
+docker compose -f docker/docker-compose.full.yml up --build
+```
+
+Web UI at http://localhost:5173 · API at http://localhost:3001
