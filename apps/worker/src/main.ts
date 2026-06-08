@@ -5,15 +5,18 @@ const { env, scheduler, registry } = buildWorker();
 
 console.log("[worker] Starting up...");
 
-// Seed apps from environment
-for (const appId of env.SEED_APP_IDS) {
-  registry
-    .register(appId)
-    .then((app) => console.log(`[worker] Registered app: ${app.id} (${app.country})`))
-    .catch((err) => console.error(`[worker] Failed to register app ${appId}:`, err));
-}
+// Seed apps from environment. Await registration BEFORE starting the loop so the
+// first (immediate) tick sees the seeded apps rather than racing the inserts.
+await Promise.all(
+  env.SEED_APP_IDS.map((appId) =>
+    registry
+      .register(appId)
+      .then((app) => console.log(`[worker] Registered app: ${app.id} (${app.country})`))
+      .catch((err) => console.error(`[worker] Failed to register app ${appId}:`, err)),
+  ),
+);
 
-// Start the scheduler loop
+// Start the scheduler loop (runs one tick immediately, then on the interval).
 const { stop } = startLoop(scheduler, env.WORKER_TICK_MS);
 
 // Graceful shutdown handlers
