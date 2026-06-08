@@ -1,7 +1,8 @@
-import "./happydom";
-import { test, expect, describe } from "bun:test";
+import "../../test/happydom";
+import { describe, expect, test } from "bun:test";
 import { render } from "@testing-library/react";
-import { ReviewCard } from "../src/components/ReviewCard";
+import { format, parseISO } from "date-fns";
+import { ReviewCard } from "./ReviewCard";
 
 // Note: we import render from @testing-library/react and use the container-bound
 // query helpers (getByText, getByRole) from render's return value.
@@ -52,7 +53,7 @@ describe("ReviewCard", () => {
     const { container } = render(<ReviewCard review={testReview} />);
     const abbr = container.querySelector("abbr");
     expect(abbr).toBeDefined();
-    const absoluteTime = new Date(testReview.submittedAt).toLocaleString();
+    const absoluteTime = format(parseISO(testReview.submittedAt), "PPpp");
     expect(abbr?.getAttribute("title")).toBe(absoluteTime);
   });
 

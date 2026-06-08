@@ -1,4 +1,4 @@
-import type { AppDto } from "@runway/shared";
+import type { AppDto } from "@packages/shared/index";
 
 interface AppSelectorProps {
   apps: AppDto[];

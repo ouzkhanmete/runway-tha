@@ -6,11 +6,7 @@ export function RatingStars({ rating }: RatingStarsProps) {
   const stars = Array.from({ length: 5 }, (_, i) => i + 1);
 
   return (
-    <span
-      className="rating-stars"
-      aria-label={`${rating} out of 5`}
-      role="img"
-    >
+    <span className="rating-stars" aria-label={`${rating} out of 5`} role="img">
       {stars.map((star) => (
         <span
           key={star}

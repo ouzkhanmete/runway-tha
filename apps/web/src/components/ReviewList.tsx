@@ -1,4 +1,4 @@
-import type { ReviewDto } from "@runway/shared";
+import type { ReviewDto } from "@packages/shared/index";
 import { ReviewCard } from "./ReviewCard";
 
 interface ReviewListProps {
@@ -31,10 +31,9 @@ export function ReviewList({ reviews, isLoading, error }: ReviewListProps) {
       <div className="review-list-state">
         <h3>No reviews found</h3>
         <p>
-          No reviews were submitted in the selected time window. The default
-          window is 48 hours, which may show no results for apps with lower
-          review velocity. Try a wider window (7 days or 30 days) to see more
-          reviews.
+          No reviews were submitted in the selected time window. The default window is 48 hours,
+          which may show no results for apps with lower review velocity. Try a wider window (7 days
+          or 30 days) to see more reviews.
         </p>
       </div>
     );

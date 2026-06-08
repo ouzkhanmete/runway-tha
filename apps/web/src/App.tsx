@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { useApps } from "./hooks/useApps";
-import { useReviews } from "./hooks/useReviews";
 import { AddAppForm } from "./components/AddAppForm";
 import { AppSelector } from "./components/AppSelector";
-import { WindowPicker } from "./components/WindowPicker";
 import { ReviewList } from "./components/ReviewList";
+import { WindowPicker } from "./components/WindowPicker";
+import { useApps } from "./hooks/useApps";
+import { useReviews } from "./hooks/useReviews";
 
 export function App() {
   const { data: apps, isLoading: appsLoading } = useApps();
@@ -42,11 +42,7 @@ export function App() {
               Loading apps…
             </span>
           ) : (
-            <AppSelector
-              apps={apps ?? []}
-              value={selectedAppId}
-              onChange={setSelectedAppId}
-            />
+            <AppSelector apps={apps ?? []} value={selectedAppId} onChange={setSelectedAppId} />
           )}
         </div>
 

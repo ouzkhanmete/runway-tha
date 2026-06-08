@@ -20,7 +20,7 @@ export function AddAppForm() {
               onSuccess: () => {
                 setAppId("");
               },
-            }
+            },
           );
         }}
       >

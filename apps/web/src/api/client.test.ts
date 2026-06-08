@@ -1,6 +1,6 @@
-import { test, expect, describe } from "bun:test";
-import { createApiClient } from "../src/api/client";
-import type { ReviewDto, AppDto } from "@runway/shared";
+import { describe, expect, test } from "bun:test";
+import type { AppDto, ReviewDto } from "@packages/shared/index";
+import { createApiClient } from "./client";
 
 const sampleReview: ReviewDto = {
   id: "r1",

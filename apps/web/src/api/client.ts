@@ -1,10 +1,10 @@
 import {
-  ReviewDtoSchema,
-  AppDtoSchema,
   ApiErrorSchema,
-  type ReviewDto,
   type AppDto,
-} from "@runway/shared";
+  AppDtoSchema,
+  type ReviewDto,
+  ReviewDtoSchema,
+} from "@packages/shared/index";
 
 export function createApiClient(opts?: { fetch?: typeof fetch; baseUrl?: string }) {
   const f = opts?.fetch ?? fetch;
@@ -21,8 +21,7 @@ export function createApiClient(opts?: { fetch?: typeof fetch; baseUrl?: string 
   }
 
   return {
-    getApps: async (): Promise<AppDto[]> =>
-      AppDtoSchema.array().parse(await req("/api/apps")),
+    getApps: async (): Promise<AppDto[]> => AppDtoSchema.array().parse(await req("/api/apps")),
 
     registerApp: async (appId: string, country?: string): Promise<AppDto> =>
       AppDtoSchema.parse(
@@ -30,12 +29,12 @@ export function createApiClient(opts?: { fetch?: typeof fetch; baseUrl?: string 
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ appId, country }),
-        })
+        }),
       ),
 
     getReviews: async (appId: string, windowHours: number): Promise<ReviewDto[]> =>
       ReviewDtoSchema.array().parse(
-        await req(`/api/apps/${appId}/reviews?windowHours=${windowHours}`)
+        await req(`/api/apps/${appId}/reviews?windowHours=${windowHours}`),
       ),
   };
 }
