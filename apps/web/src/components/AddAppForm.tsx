@@ -1,28 +1,29 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useRegisterApp } from "../hooks/useRegisterApp";
 
 export function AddAppForm() {
   const [appId, setAppId] = useState("");
   const { mutate, isPending, error } = useRegisterApp();
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const trimmed = appId.trim();
-    if (!trimmed) return;
-    mutate(
-      { appId: trimmed },
-      {
-        onSuccess: () => {
-          setAppId("");
-        },
-      }
-    );
-  }
-
   return (
     <div className="control-group">
       <label htmlFor="add-app-input">Add App</label>
-      <form className="add-app-form" onSubmit={handleSubmit}>
+      <form
+        className="add-app-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const trimmed = appId.trim();
+          if (!trimmed) return;
+          mutate(
+            { appId: trimmed },
+            {
+              onSuccess: () => {
+                setAppId("");
+              },
+            }
+          );
+        }}
+      >
         <input
           id="add-app-input"
           type="text"
