@@ -79,3 +79,20 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - Fix `bun run migrate` to resolve `DATABASE_URL` via the env loader (was undefined under `--cwd`).
 
 **Result:** **81/81 tests green**, all five packages type-check clean, API verified **20/20 reliable** against a live DB, full docker stack verified. Committed across Waves 2–3 + 5 fix commits.
+
+---
+
+## Turn 5 — Polish pass: 14 refinements, run as a parallel subagent fleet (2026-06-08)
+
+**Prompt:** a list of 14 code-quality refinements (controller classes, clearer Dockerfile names, colocated tests, `abc.repository.ts`-style naming, range-based window with no allow-list, Biome, DTO file renames, split `ports/` into `repositories/`+`api-clients/`, a repository factory, date-fns, enums over magic strings, path aliases, drop worker seeding, ms-based staleness) — *"spawn a set of subagents to do the polishing in parallel."* Plus four mid-flight follow-ups (full ISO `Country` enum; consolidate to `@packages/*`/`@apps/*` aliases; idempotent init migration; review indexes for the access patterns).
+
+**Approach (orchestrated waves over disjoint dirs):**
+- **Phase 0 (orchestrator):** Biome config, the `@packages/*`/`@apps/*` tsconfig aliases (after probing that Bun resolves them transitively), env-var cleanup, deps (`@biomejs/biome`, `date-fns`), and the small `packages/shared` contract (full **249-code ISO `Country` enum**, `makeReviewsQuerySchema` accepting any int **1–720**, default 48).
+- **Phase 1 (`core` ∥ `docker`):** restructured `packages/core` — `application/repositories/` + `application/api-clients/`, `AppleRssApiClient`, a `createRepositories(db)` **factory**, `SyncStatus`/`Country` enums, **date-fns** date handling, **ms** staleness, env cleanup, colocated tests; renamed Dockerfiles → `backend`/`frontend`.
+- **Orchestrator:** rewrote `packages/core` imports to the new aliases; added a `sync_runs (app_id, status, finished_at)` index for the staleness query; **regenerated the init migration as idempotent** (`CREATE … IF NOT EXISTS`, FK `ADD CONSTRAINT` in `DO/EXCEPTION` blocks — verified re-runnable) and confirmed `reviews.id` PK is the unique index the upsert needs.
+- **Phase 2 (`api` ∥ `worker` ∥ `web`):** API **controller classes**; worker **reads the apps table only** (seeding removed — apps onboarded via `POST /apps`); web moved to **date-fns** + Vite alias resolution; tests colocated.
+- **Phase 3 (orchestrator):** `bun run format` (Biome, 55 files), a docs-update agent, and verification.
+
+**What changed:** the whole monorepo, restructured per the 14 items + 4 follow-ups, then **Biome-formatted**.
+
+**Verified live:** **82/82 tests green**, all five packages type-check clean; the **no-seeding flow** end-to-end (register via `POST /apps` → worker's tick ingests → 6 reviews newest-first); window now accepts **any 1–720** (200 ok, 721/0 → 400); the **dockerized full stack** (renamed Dockerfiles) served reviews through the web→api proxy (worker `processed: 1`). Committed in 9 conventional commits.
