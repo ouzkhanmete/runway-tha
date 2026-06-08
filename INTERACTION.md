@@ -161,3 +161,18 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - **Docs** — `etl.md` (enrichment + seed step), `infra.md` (seed service + startup order), `decisions.md`, `data-model.md`, `frontend.md`, `README`.
 
 **Verified live (clean full-stack rebuild):** seed inserted the 10 top-app ids → worker enriched **all 10 names** (ChatGPT, Google, Claude…) and ingested reviews (500 each) → names + pages served through the web proxy. **113/113 tests green** (added: lookup client, scheduler enrichment, `updateName`, `parseTopAppIds`); all packages type-check clean; Biome-formatted.
+
+---
+
+## Turn 11 — Names + existence at registration; validation UX (run via subagents) (2026-06-08)
+
+**Prompt:** (1) instead of the worker enriching the name, fetch once at registration and store the name straight away; (2) handle a non-existent id (and a non-numeric/UUID id) — throw **400** and turn the add-app form red with the actual error. *"Spawn subagents to quickly do it."*
+
+**Investigation (settled the design):** the **reviews feed can't do the job** — a non-existent id returns HTTP 200 with an empty feed (indistinguishable from a real app with no recent reviews) and it carries no app name. The **iTunes Lookup API** answers both in one call: non-existent → `resultCount: 0`; valid → `trackName`.
+
+**Approach:** three subagents over disjoint areas (backend / web / docs); orchestrator owned the contract, verification, and commits.
+- **Backend** — `AppMetadataClient.lookup(id,country) → {found,name}|{found:false}` (throws on transient); `AppRegistryService.register` looks up once (skipped if already tracked), rejects not-found with `ValidationError → 400`, and inserts **with the name**; the seed now onboards via `register`; the worker's name enrichment + `updateName` are removed; the API error envelope surfaces the specific first Zod issue.
+- **Web** — the add-app input/form turn red and show the server's message; editing resets the error; `useApps` no longer polls for names.
+- **Docs** — etl/api/decisions/data-model/frontend/README updated to "resolved at registration, not by the worker."
+
+**Verified live (full-stack rebuild):** UUID → `400` "appId must be numeric"; non-existent `9999999999` → `400` "App not found in the App Store: 9999999999"; valid `324684580` → `201` with `name: "Spotify: Music and Podcasts"` set **immediately**. **116/116 tests green**; all packages type-check clean; Biome-formatted.
