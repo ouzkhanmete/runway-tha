@@ -127,3 +127,37 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - **Docs** — `api.md`, `data-model.md`, `decisions.md` (keyset over OFFSET), `frontend.md`, `testing.md`, plus `architecture.md`/`CLAUDE.md` window/count touch-ups.
 
 **Verified:** **102/102 tests green** (repo walks every page with no gaps/repeats + id tie-break determinism; e2e covers cursor pagination, explicit limit, malformed-cursor 400); all five packages type-check clean; Biome-formatted.
+
+---
+
+## Turn 8 — Docs: trim CLAUDE.md + expand the README into an architecture walkthrough (2026-06-08)
+
+**Prompt:** "cleanup the CLAUDE.md, remove redundant commands, everything is available in README already", then "explain everything how it works in README so the reviewer would understand … the whole architecture. Maybe a diagram … in pixel art."
+
+**What changed:** removed CLAUDE.md's `## Commands` section (duplicated the README quick-start + a stale test count) in favour of a pointer to README / `package.json` / docs. Rewrote the README into a full architecture walkthrough: an ASCII **runtime data-flow diagram** (RSS → worker → Postgres → API → web), a **clean-architecture layering** diagram, a "how the key pieces work" tour (idempotency, worker-as-sole-writer, atomic claim, keyset pagination, shared DTOs, test pyramid), a data-model/API reference, app-id discovery tips, and a documentation map. Refreshed the README's stale window/tick/range numbers to match the session.
+
+---
+
+## Turn 9 — Durable persistence: bind-mount Postgres into the repo (R3) (2026-06-08)
+
+**Prompt:** check the original requirements, "especially regarding 'data should live through a restart' — maybe we need a docker volume saved to a disk (current repo root) and gitignored."
+
+**What changed:** audited R1–R6 (all met). For **R3**, the app-level half (idempotent upsert by stable id) was already solid; added the durable-storage half by switching the **dev and full-stack Postgres from named volumes to bind mounts** at gitignored `./.data/postgres-{dev,full}`. Because bind mounts aren't Docker-managed, data survives `restart`, `down`+`up`, and even `down -v`. Test compose stays `tmpfs` (clean slate by design). `.gitignore` keeps `.data/` (tracking only `.gitkeep`). Docs: new "Data persistence" section in `infra.md`, plus `data-model.md` / `README`.
+
+**Verified live:** ingest 500 reviews → `down` → `up` → 500; → `down -v` → `up` → **still 500**; data files present in `./.data/postgres-full/`.
+
+---
+
+## Turn 10 — App names + top-apps seeding for a pre-populated demo (2026-06-08)
+
+**Prompt:** show the app's name above the reviews (and save it to the DB if the RSS provides it); add a seed container in `docker-compose.full` that inserts the 10 top-free apps before anything else starts (skip if already present) so the worker pre-populates the UI; dropdown should read "{app_name} ({app_id})". Guidance: insert just an id; the worker fills the name when it consumes it.
+
+**Investigation:** the **customer-reviews feed has no app name** (`feed.title` is generic). So the name source is the **iTunes Lookup API** (`/lookup?id=…` → `trackName`), confirmed live; the **top-apps RSS** gives id+name for seeding.
+
+**What changed:**
+- **Name enrichment** — new `AppMetadataClient` port + `ItunesLookupApiClient` (best-effort, null on any failure); `AppRepository.updateName`; the scheduler backfills each app's name once (while null) in the tick that ingests its reviews — uniform for manual adds and seeds (both store id-only).
+- **Seed** — `packages/core/src/scripts/seed-top-apps.ts` (+ `seed` script) fetches the top-free RSS and inserts ids only (idempotent; exits 0 if the feed is down). A dedicated `seed` compose service runs after `migrate` and **before** worker/api (`service_completed_successfully`).
+- **Web** — app name as an `<h2>` above the reviews; dropdown shows "{name} ({id})" (id-only until resolved); `useApps` polls every 5s while any name is null, then stops.
+- **Docs** — `etl.md` (enrichment + seed step), `infra.md` (seed service + startup order), `decisions.md`, `data-model.md`, `frontend.md`, `README`.
+
+**Verified live (clean full-stack rebuild):** seed inserted the 10 top-app ids → worker enriched **all 10 names** (ChatGPT, Google, Claude…) and ingested reviews (500 each) → names + pages served through the web proxy. **113/113 tests green** (added: lookup client, scheduler enrichment, `updateName`, `parseTopAppIds`); all packages type-check clean; Biome-formatted.
