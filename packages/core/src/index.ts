@@ -22,6 +22,8 @@ export * from "./application/ports/review-feed-client";
 export * from "./application/services/ingest-reviews.service";
 export * from "./application/services/review-query.service";
 export * from "./application/services/app-registry.service";
+export * from "./application/services/concurrency";
+export * from "./application/services/sync-scheduler.service";
 
 // Infrastructure: feed
 export * from "./infrastructure/feed/feed-types";
