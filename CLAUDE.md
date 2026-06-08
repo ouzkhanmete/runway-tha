@@ -54,52 +54,8 @@ The full design spec lives at `docs/superpowers/specs/2026-06-08-app-store-revie
 - **Validation:** Zod DTOs at the API boundary; schemas live in `packages/shared` and are reused by the FE.
 - **Don't commit** `docs/superpowers/` (git-ignored) or `.env`.
 
-## Commands
+## Running it
 
-### Database
+Commands are not duplicated here. See [`README.md`](./README.md) for the quick-start (local dev and one-command Docker), `package.json` scripts for the full list, and [`docs/infra.md`](docs/infra.md) (DB · migrations · Docker) / [`docs/testing.md`](docs/testing.md) (running tests) for subsystem detail.
 
-```sh
-bun run db:up          # Start local Postgres on :5432 (dev)
-bun run db:down        # Stop local Postgres
-bun run db:test:up     # Start test Postgres on :5433 (required before running tests)
-bun run db:test:down   # Stop test Postgres
-```
-
-### Migrations
-
-```sh
-bun run migrate        # Apply migrations to DATABASE_URL (default: local dev DB)
-bun run generate       # Regenerate migration files after schema changes
-```
-
-### Development (run each in a separate terminal)
-
-```sh
-bun run dev:worker     # Start the ETL worker (watches for changes)
-bun run dev:api        # Start the Hono API on :3000 (watches for changes)
-bun run dev:web        # Start the Vite dev server on :5173
-```
-
-There is no seed step — register an app via the web UI (http://localhost:5173) or `POST /apps` (e.g. App Store ID `595068606`), then the worker picks it up on its next tick. The Vite dev server proxies `/api` to `localhost:3000`.
-
-### Tests
-
-```sh
-bun run db:test:up     # Start test DB first (only needed once per session)
-bun test               # Run all 89 tests (unit + integration + e2e)
-```
-
-### Formatting
-
-```sh
-bun run format         # Biome: format + organise imports (write mode)
-bun run format:check   # Biome: check only (CI-safe)
-```
-
-### Full stack (Docker only — no local tooling required)
-
-```sh
-docker compose -f docker/docker-compose.full.yml up --build
-```
-
-Web UI at http://localhost:5173 · API at http://localhost:3001
+There is **no seed step** — register an app via the web UI or `POST /apps` (e.g. App Store ID `595068606`); the worker picks it up on its next tick.

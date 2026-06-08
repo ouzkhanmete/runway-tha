@@ -8,8 +8,8 @@ Built as a take-home assessment, with [Claude Code](https://docs.claude.com/en/d
 
 - A **worker** polls the App Store RSS feed on a schedule and upserts reviews into Postgres (idempotent by stable review id → safe to stop/restart without losing or duplicating data).
 - An **API** serves the stored reviews (newest-first, configurable time window) and lets you register new apps to track.
-- A **web** app displays the reviews: pick an app, pick a window (48h / 7d / 30d), read the reviews.
-- **Multi-app by design:** onboarding an app is a single `POST /apps`; the worker self-discovers and backfills it on the next tick.
+- A **web** app displays the reviews: pick an app, pick a window (48h / 7d / 30d / 60d / 90d / 1y), and scroll through them (cursor-paginated, 5 at a time, infinite scroll). The selected app is kept in the URL (`?appId=`) so it survives a refresh.
+- **Multi-app by design:** onboarding an app is a single `POST /apps`; the worker self-discovers and backfills it on the next tick. The worker is also safe to run as multiple instances (apps are claimed atomically) and never overlaps its own ticks.
 
 ## Tech stack
 
@@ -56,7 +56,7 @@ bun run dev:api      # Hono API on :3000
 bun run dev:web      # React UI on :5173 (proxies /api to :3000)
 ```
 
-Open http://localhost:5173. **Add an app** using the "Add app" form (enter an App Store ID, e.g. `595068606`) or `POST /apps`. The worker ingests it on its next tick (within 60 s by default). If no reviews appear in the default 48h window, use the **7d** or **30d** picker — apps like `595068606` may have review gaps longer than 48h. The API accepts any window from 1–720 hours.
+Open http://localhost:5173. **Add an app** using the "Add app" form (enter an App Store ID, e.g. `595068606`) or `POST /apps`. The worker ingests it on its next tick (within ~10 s by default), and the UI shows a loader until the first reviews land. If no reviews appear in the default 48h window, use a wider picker (**7d** / **30d** / up to **1y**) — apps like `595068606` may have review gaps longer than 48h. The API accepts any window from 1–8760 hours.
 
 ### Option B — one-command full stack (Docker only)
 
@@ -69,7 +69,7 @@ docker compose -f docker/docker-compose.full.yml up --build
 - The `migrate` service runs automatically before the worker and API start.
 - The worker starts polling immediately — open http://localhost:5173, add an App Store ID (e.g. `595068606`) via the form or `POST /apps`, and the worker ingests it within one tick.
 
-> If the 48h window shows no reviews, switch to **7d** or **30d** — the app's most recent review may be several days old. The API also accepts any window from 1–720 hours.
+> If the 48h window shows no reviews, switch to a wider window (**7d** … **1y**) — the app's most recent review may be several days old. The API accepts any window from 1–8760 hours.
 
 ## Status
 
