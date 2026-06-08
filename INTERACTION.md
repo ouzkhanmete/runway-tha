@@ -48,3 +48,15 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - Infra: `docker/docker-compose.yml` (local PG 18) + `docker-compose.test.yml` (test PG 18 on :5433). Caught a **postgres:18 data-dir change** — mount must be `/var/lib/postgresql`, not `/…/data`, or pg18 won't start.
 - `packages/core`: Drizzle schema (`apps`, `reviews`, `sync_runs` + recent-index), **Bun-native SQL driver** (`drizzle-orm/bun-sql`, no `pg` dependency), env loader, initial migration, and a dockerized test-DB harness (`ensureMigrated` / `truncateAll`) + RSS fixtures.
 - Verified: `bun test` 8/8 green; migration generates 3 tables + index; test DB migrates against real dockerized Postgres. Committed in 5 conventional commits.
+
+---
+
+## Turn 3 — Execute: Wave 1 (core + web, in parallel) (2026-06-08)
+
+**Prompt:** (continuation of the execution loop) — ran the two role-lanes concurrently.
+
+**What changed (Wave 1 — `Agent BE` and `Agent FE` dispatched in parallel, both TDD; orchestrator reviewed, fixed, and committed):**
+- **`packages/core` (Agent BE):** domain entities + repository/feed-client **ports**; pure RSS→domain **mapper** (skips the rating-less metadata entry); **`AppStoreFeedClient`** (paginates 10 pages, exponential backoff/retry on 403/429/5xx — unit-tested with injected `fetch`); **Drizzle repositories** (integration-tested against real PG — **idempotent upsert proves restart-safety**, newest-first window query, `findDueForSync` staleness logic); **services** (`IngestReviewsService`, `ReviewQueryService`, `AppRegistryService`). 42 tests.
+- **`apps/web` (Agent FE):** Vite + React + TanStack Query shell with a `/api` dev proxy; typed **API client** (Zod-parses responses); query **hooks**; **components** (rating stars, review card with relative+absolute time, list with loading/empty/error states, app selector, add-app form, window picker). 15 tests (happy-dom).
+- **Orchestrator review caught a real defect:** BE had named the concrete repository classes identically to the port interfaces (ambiguous `@runway/core` re-exports) — sent the agent back to rename them to `Drizzle*Repository`. Also shed unused `React` imports in the FE.
+- Verified end-to-end: **64/64 tests green**, core + web type-checks clean. Committed in 7 conventional commits.
