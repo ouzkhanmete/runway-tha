@@ -1,8 +1,10 @@
-import { eq, and, gt, notExists } from "drizzle-orm";
+import type { AppRepository } from "@packages/core/application/repositories/app.repository";
+import type { App } from "@packages/core/domain/app";
+import { SyncStatus } from "@packages/core/domain/sync-status";
+import { Country } from "@packages/shared/index";
+import { and, eq, gt, notExists } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { schema } from "../db/client";
-import type { AppRepository } from "../../application/ports/app-repository";
-import type { App } from "../../domain/app";
 
 const { apps, syncRuns } = schema;
 
@@ -19,17 +21,13 @@ export class DrizzleAppRepository implements AppRepository {
     return rows[0] ? toApp(rows[0]) : null;
   }
 
-  async create(input: {
-    id: string;
-    name?: string | null;
-    country?: string;
-  }): Promise<App> {
+  async create(input: { id: string; name?: string | null; country?: Country }): Promise<App> {
     await this.db
       .insert(apps)
       .values({
         id: input.id,
         name: input.name ?? null,
-        country: input.country ?? "us",
+        country: input.country ?? Country.US,
       })
       .onConflictDoNothing();
 
@@ -49,11 +47,11 @@ export class DrizzleAppRepository implements AppRepository {
             .where(
               and(
                 eq(syncRuns.appId, apps.id),
-                eq(syncRuns.status, "success"),
-                gt(syncRuns.finishedAt, staleBefore)
-              )
-            )
-        )
+                eq(syncRuns.status, SyncStatus.Success),
+                gt(syncRuns.finishedAt, staleBefore),
+              ),
+            ),
+        ),
       );
     return rows.map(toApp);
   }
@@ -63,7 +61,7 @@ function toApp(row: typeof apps.$inferSelect): App {
   return {
     id: row.id,
     name: row.name,
-    country: row.country,
+    country: row.country as Country,
     createdAt: row.createdAt,
   };
 }

@@ -1,6 +1,7 @@
-import type { Review } from "../../domain/review";
-import type { Rating } from "../../domain/rating";
-import type { FeedEntry, FeedJson } from "./feed-types";
+import type { Rating } from "@packages/core/domain/rating";
+import type { Review } from "@packages/core/domain/review";
+import { isValid, parseISO } from "date-fns";
+import type { FeedEntry, FeedJson } from "./apple-rss.types";
 
 /**
  * Map a single raw feed entry to a Review domain object.
@@ -18,8 +19,8 @@ export function mapEntry(appId: string, e: FeedEntry): Review | null {
   const id = e.id?.label;
   const updatedRaw = e.updated?.label;
   if (!id || !updatedRaw) return null;
-  const submittedAt = new Date(updatedRaw);
-  if (Number.isNaN(submittedAt.getTime())) return null;
+  const submittedAt = parseISO(updatedRaw);
+  if (!isValid(submittedAt)) return null;
 
   return {
     id: String(id),
@@ -41,7 +42,5 @@ export function mapEntry(appId: string, e: FeedEntry): Review | null {
 export function mapFeedPage(appId: string, json: FeedJson): Review[] {
   const raw = json?.feed?.entry;
   const entries: FeedEntry[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  return entries
-    .map((e) => mapEntry(appId, e))
-    .filter((r): r is Review => r !== null);
+  return entries.map((e) => mapEntry(appId, e)).filter((r): r is Review => r !== null);
 }

@@ -1,5 +1,6 @@
-import type { Review } from "../../domain/review";
-import type { ReviewRepository } from "../ports/review-repository";
+import type { ReviewRepository } from "@packages/core/application/repositories/review.repository";
+import type { Review } from "@packages/core/domain/review";
+import { subHours } from "date-fns";
 
 interface ReviewQueryDeps {
   reviews: ReviewRepository;
@@ -15,7 +16,7 @@ export class ReviewQueryService {
 
   async getRecent(appId: string, windowHours: number): Promise<Review[]> {
     const now = this.clock();
-    const since = new Date(now.getTime() - windowHours * 3_600_000);
+    const since = subHours(now, windowHours);
     return this.deps.reviews.findRecent(appId, since);
   }
 }

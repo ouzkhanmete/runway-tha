@@ -1,9 +1,10 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { Country } from "@packages/shared/index";
 import { sql } from "drizzle-orm";
-import { ensureMigrated, getTestDb, truncateAll } from "../helpers/test-db";
-import { DrizzleReviewRepository as ReviewRepo } from "../../src/infrastructure/repositories/review.repository";
-import { DrizzleAppRepository as AppRepo } from "../../src/infrastructure/repositories/app.repository";
-import { makeReview } from "../helpers/fixtures";
+import { makeReview } from "../../../test/helpers/fixtures";
+import { ensureMigrated, getTestDb, truncateAll } from "../../../test/helpers/test-db";
+import { DrizzleAppRepository as AppRepo } from "./app.repository";
+import { DrizzleReviewRepository as ReviewRepo } from "./review.repository";
 
 const db = getTestDb();
 const reviews = new ReviewRepo(db);
@@ -18,7 +19,7 @@ beforeEach(async () => {
 });
 
 async function seedApp(appId = "595068606") {
-  return apps.create({ id: appId, country: "us" });
+  return apps.create({ id: appId, country: Country.US });
 }
 
 describe("ReviewRepository", () => {
@@ -62,9 +63,21 @@ describe("ReviewRepository", () => {
     test("returns only rows with submittedAt >= since, ordered newest-first", async () => {
       await seedApp();
       const since = new Date("2026-06-01T00:00:00Z");
-      const old = makeReview({ id: "old", appId: "595068606", submittedAt: new Date("2026-05-31T12:00:00Z") });
-      const recent1 = makeReview({ id: "r1", appId: "595068606", submittedAt: new Date("2026-06-02T10:00:00Z") });
-      const recent2 = makeReview({ id: "r2", appId: "595068606", submittedAt: new Date("2026-06-03T10:00:00Z") });
+      const old = makeReview({
+        id: "old",
+        appId: "595068606",
+        submittedAt: new Date("2026-05-31T12:00:00Z"),
+      });
+      const recent1 = makeReview({
+        id: "r1",
+        appId: "595068606",
+        submittedAt: new Date("2026-06-02T10:00:00Z"),
+      });
+      const recent2 = makeReview({
+        id: "r2",
+        appId: "595068606",
+        submittedAt: new Date("2026-06-03T10:00:00Z"),
+      });
       await reviews.upsertMany([old, recent1, recent2]);
 
       const result = await reviews.findRecent("595068606", since);
@@ -82,7 +95,11 @@ describe("ReviewRepository", () => {
 
     test("submittedAt is a Date instance", async () => {
       await seedApp();
-      const r = makeReview({ id: "date-test", appId: "595068606", submittedAt: new Date("2026-06-05T00:00:00Z") });
+      const r = makeReview({
+        id: "date-test",
+        appId: "595068606",
+        submittedAt: new Date("2026-06-05T00:00:00Z"),
+      });
       await reviews.upsertMany([r]);
       const result = await reviews.findRecent("595068606", new Date("2026-06-04T00:00:00Z"));
       expect(result[0].submittedAt).toBeInstanceOf(Date);

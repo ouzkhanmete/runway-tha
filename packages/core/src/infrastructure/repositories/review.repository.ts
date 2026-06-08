@@ -1,9 +1,9 @@
-import { sql, eq, and, gte, desc } from "drizzle-orm";
+import type { ReviewRepository } from "@packages/core/application/repositories/review.repository";
+import type { Rating } from "@packages/core/domain/rating";
+import type { Review } from "@packages/core/domain/review";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { schema } from "../db/client";
-import type { ReviewRepository } from "../../application/ports/review-repository";
-import type { Review } from "../../domain/review";
-import type { Rating } from "../../domain/rating";
 
 const { reviews } = schema;
 
@@ -51,14 +51,14 @@ export class DrizzleReviewRepository implements ReviewRepository {
       .orderBy(desc(reviews.submittedAt));
 
     return rows.map((r) => ({
-        id: r.id,
-        appId: r.appId,
-        author: r.author,
-        title: r.title,
-        content: r.content,
-        rating: r.rating as Rating,
-        version: r.version,
-        submittedAt: r.submittedAt,
-      }));
+      id: r.id,
+      appId: r.appId,
+      author: r.author,
+      title: r.title,
+      content: r.content,
+      rating: r.rating as Rating,
+      version: r.version,
+      submittedAt: r.submittedAt,
+    }));
   }
 }

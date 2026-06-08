@@ -1,6 +1,6 @@
 import { migrate } from "drizzle-orm/bun-sql/migrator";
-import { createDb } from "./client";
 import { loadEnv } from "../../config/env";
+import { createDb } from "./client";
 
 // Use the same env loader as the apps so DATABASE_URL defaults to the local dev
 // URL when unset (matching `drizzle.config.ts`) and respects an explicit value.

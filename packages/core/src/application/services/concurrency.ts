@@ -1,7 +1,7 @@
 export async function mapWithConcurrency<T>(
   items: T[],
   limit: number,
-  fn: (item: T) => Promise<void>
+  fn: (item: T) => Promise<void>,
 ): Promise<void> {
   const queue = [...items.entries()];
   const workers = Array.from(
@@ -12,7 +12,7 @@ export async function mapWithConcurrency<T>(
         if (!next) return;
         await fn(next[1]);
       }
-    }
+    },
   );
   await Promise.all(workers);
 }

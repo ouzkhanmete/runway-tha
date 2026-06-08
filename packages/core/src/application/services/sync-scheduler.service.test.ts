@@ -1,21 +1,22 @@
-import { describe, test, expect } from "bun:test";
-import { SyncSchedulerService } from "../../src/application/services/sync-scheduler.service";
-import type { App } from "../../src/domain/app";
+import { describe, expect, test } from "bun:test";
+import type { App } from "@packages/core/domain/app";
+import { Country } from "@packages/shared/index";
+import { SyncSchedulerService } from "./sync-scheduler.service";
 
 function makeApp(id: string): App {
   return {
     id,
     name: null,
-    country: "us",
+    country: Country.US,
     createdAt: new Date(),
   };
 }
 
 describe("SyncSchedulerService", () => {
-  test("calls findDueForSync with (now - stalenessMin * 60000)", async () => {
+  test("calls findDueForSync with (now - stalenessMs)", async () => {
     const fixedNow = new Date("2026-06-08T12:00:00Z");
-    const stalenessMin = 15;
-    const expectedStaleBefore = new Date(fixedNow.getTime() - stalenessMin * 60_000);
+    const stalenessMs = 15 * 60_000;
+    const expectedStaleBefore = new Date(fixedNow.getTime() - stalenessMs);
 
     const dueSyncCalls: Date[] = [];
     const fakeApps = {
@@ -34,7 +35,7 @@ describe("SyncSchedulerService", () => {
     const scheduler = new SyncSchedulerService({
       apps: fakeApps,
       ingest: fakeIngest as any,
-      stalenessMin,
+      stalenessMs,
       concurrency: 1,
       clock: () => fixedNow,
     });
@@ -65,7 +66,7 @@ describe("SyncSchedulerService", () => {
     const scheduler = new SyncSchedulerService({
       apps: fakeApps,
       ingest: fakeIngest as any,
-      stalenessMin: 15,
+      stalenessMs: 15 * 60_000,
       concurrency: 2,
       clock: () => new Date(),
     });
@@ -100,7 +101,7 @@ describe("SyncSchedulerService", () => {
     const scheduler = new SyncSchedulerService({
       apps: fakeApps,
       ingest: fakeIngest as any,
-      stalenessMin: 15,
+      stalenessMs: 15 * 60_000,
       concurrency: 3,
       clock: () => new Date(),
     });
@@ -127,7 +128,7 @@ describe("SyncSchedulerService", () => {
     const scheduler = new SyncSchedulerService({
       apps: fakeApps,
       ingest: fakeIngest as any,
-      stalenessMin: 15,
+      stalenessMs: 15 * 60_000,
       concurrency: 1,
       clock: () => new Date(),
     });

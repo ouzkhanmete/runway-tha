@@ -1,13 +1,14 @@
-import { describe, test, expect } from "bun:test";
-import { IngestReviewsService } from "../../src/application/services/ingest-reviews.service";
-import type { App } from "../../src/domain/app";
-import type { Review } from "../../src/domain/review";
+import { describe, expect, test } from "bun:test";
+import type { App } from "@packages/core/domain/app";
+import type { Review } from "@packages/core/domain/review";
+import { Country } from "@packages/shared/index";
+import { IngestReviewsService } from "./ingest-reviews.service";
 
 function makeApp(overrides: Partial<App> = {}): App {
   return {
     id: "595068606",
     name: "TestApp",
-    country: "us",
+    country: Country.US,
     createdAt: new Date(),
     ...overrides,
   };
@@ -125,12 +126,16 @@ describe("IngestReviewsService", () => {
       fetchAllPages: async () => ({ reviews: [makeTestReview("x")], pagesFetched: 1 }),
     };
     const fakeReviews = {
-      upsertMany: async () => { throw new Error("db error"); },
+      upsertMany: async () => {
+        throw new Error("db error");
+      },
       findRecent: async () => [],
     };
     const fakeSyncRuns = {
       start: async () => 1,
-      finish: async (id: number, r: any) => { finishCalls.push({ id, r }); },
+      finish: async (id: number, r: any) => {
+        finishCalls.push({ id, r });
+      },
     };
 
     const service = new IngestReviewsService({

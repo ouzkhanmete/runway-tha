@@ -1,8 +1,10 @@
-import { describe, test, expect, beforeAll, beforeEach } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { SyncStatus } from "@packages/core/domain/sync-status";
+import { Country } from "@packages/shared/index";
 import { sql } from "drizzle-orm";
-import { ensureMigrated, getTestDb, truncateAll } from "../helpers/test-db";
-import { DrizzleAppRepository as AppRepo } from "../../src/infrastructure/repositories/app.repository";
-import { DrizzleSyncRunRepository as SyncRunRepo } from "../../src/infrastructure/repositories/sync-run.repository";
+import { ensureMigrated, getTestDb, truncateAll } from "../../../test/helpers/test-db";
+import { DrizzleAppRepository as AppRepo } from "./app.repository";
+import { DrizzleSyncRunRepository as SyncRunRepo } from "./sync-run.repository";
 
 const db = getTestDb();
 const apps = new AppRepo(db);
@@ -19,15 +21,15 @@ beforeEach(async () => {
 describe("AppRepository", () => {
   describe("create", () => {
     test("creates an app and returns it", async () => {
-      const app = await apps.create({ id: "12345", country: "us" });
+      const app = await apps.create({ id: "12345", country: Country.US });
       expect(app.id).toBe("12345");
-      expect(app.country).toBe("us");
+      expect(app.country).toBe(Country.US);
       expect(app.createdAt).toBeInstanceOf(Date);
     });
 
     test("is idempotent: second create same id → one row, no throw", async () => {
-      await apps.create({ id: "dup-id", country: "us" });
-      const app2 = await apps.create({ id: "dup-id", country: "us" });
+      await apps.create({ id: "dup-id", country: Country.US });
+      const app2 = await apps.create({ id: "dup-id", country: Country.US });
       expect(app2.id).toBe("dup-id");
       const rows = await db.execute(sql`SELECT count(*)::int AS n FROM apps WHERE id = 'dup-id'`);
       expect((rows[0] as any).n).toBe(1);
@@ -35,13 +37,13 @@ describe("AppRepository", () => {
 
     test("default country is 'us'", async () => {
       const app = await apps.create({ id: "no-country" });
-      expect(app.country).toBe("us");
+      expect(app.country).toBe(Country.US);
     });
   });
 
   describe("findById", () => {
     test("returns app when it exists", async () => {
-      await apps.create({ id: "find-me", country: "gb" });
+      await apps.create({ id: "find-me", country: Country.GB });
       const app = await apps.findById("find-me");
       expect(app).not.toBeNull();
       expect(app!.id).toBe("find-me");
@@ -82,7 +84,7 @@ describe("AppRepository", () => {
       // Run finished after staleBefore
       const runId = await syncRuns.start("fresh-app");
       await syncRuns.finish(runId, {
-        status: "success",
+        status: SyncStatus.Success,
         pagesFetched: 1,
         reviewsUpserted: 0,
       });
@@ -96,13 +98,13 @@ describe("AppRepository", () => {
       // Create a run and then manually set its finishedAt to a past date
       const runId = await syncRuns.start("stale-app");
       await syncRuns.finish(runId, {
-        status: "success",
+        status: SyncStatus.Success,
         pagesFetched: 1,
         reviewsUpserted: 0,
       });
       // Back-date the finishedAt to well before staleBefore
       await db.execute(
-        sql`UPDATE sync_runs SET finished_at = '2026-01-01T00:00:00Z' WHERE id = ${runId}`
+        sql`UPDATE sync_runs SET finished_at = '2026-01-01T00:00:00Z' WHERE id = ${runId}`,
       );
       // staleBefore is after the run's finishedAt
       const staleBefore = new Date("2026-06-01T00:00:00Z");
@@ -114,7 +116,7 @@ describe("AppRepository", () => {
       await apps.create({ id: "errored-app" });
       const runId = await syncRuns.start("errored-app");
       await syncRuns.finish(runId, {
-        status: "error",
+        status: SyncStatus.Error,
         pagesFetched: 0,
         reviewsUpserted: 0,
         error: "network failure",

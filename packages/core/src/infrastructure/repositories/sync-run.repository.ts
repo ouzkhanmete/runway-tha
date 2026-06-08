@@ -1,7 +1,8 @@
+import type { SyncRunRepository } from "@packages/core/application/repositories/sync-run.repository";
+import { SyncStatus } from "@packages/core/domain/sync-status";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { schema } from "../db/client";
-import type { SyncRunRepository } from "../../application/ports/sync-run-repository";
 
 const { syncRuns } = schema;
 
@@ -13,7 +14,7 @@ export class DrizzleSyncRunRepository implements SyncRunRepository {
       .insert(syncRuns)
       .values({
         appId,
-        status: "running",
+        status: SyncStatus.Running,
         startedAt: new Date(),
       })
       .returning({ id: syncRuns.id });
@@ -23,11 +24,11 @@ export class DrizzleSyncRunRepository implements SyncRunRepository {
   async finish(
     id: number,
     r: {
-      status: "success" | "error";
+      status: SyncStatus;
       pagesFetched: number;
       reviewsUpserted: number;
       error?: string;
-    }
+    },
   ): Promise<void> {
     await this.db
       .update(syncRuns)

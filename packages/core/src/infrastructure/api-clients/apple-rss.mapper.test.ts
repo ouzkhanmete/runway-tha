@@ -1,11 +1,20 @@
-import { describe, test, expect } from "bun:test";
-import { mapEntry, mapFeedPage } from "../../src/infrastructure/feed/review-mapper";
-import { rssEntry, metadataEntry, rssPage } from "../helpers/fixtures";
+import { describe, expect, test } from "bun:test";
+import { metadataEntry, rssEntry, rssPage } from "../../../test/helpers/fixtures";
+import { mapEntry, mapFeedPage } from "./apple-rss.mapper";
+import type { FeedEntry } from "./apple-rss.types";
 
 describe("mapEntry", () => {
   test("maps a valid entry to a Review", () => {
-    const entry = rssEntry({ id: "42", author: "Alice", title: "Great!", content: "Love it", rating: 5, version: "2.1", updated: "2026-06-01T10:00:00Z" });
-    const review = mapEntry("595068606", entry);
+    const entry = rssEntry({
+      id: "42",
+      author: "Alice",
+      title: "Great!",
+      content: "Love it",
+      rating: 5,
+      version: "2.1",
+      updated: "2026-06-01T10:00:00Z",
+    });
+    const review = mapEntry("595068606", entry as FeedEntry);
     expect(review).not.toBeNull();
     expect(review!.id).toBe("42");
     expect(review!.appId).toBe("595068606");
@@ -21,20 +30,20 @@ describe("mapEntry", () => {
 
   test("returns null for a metadataEntry (no im:rating)", () => {
     const meta = metadataEntry("595068606");
-    const result = mapEntry("595068606", meta);
+    const result = mapEntry("595068606", meta as FeedEntry);
     expect(result).toBeNull();
   });
 
   test("tolerates missing im:version -> version: null", () => {
     const entry = rssEntry({ version: null });
-    const review = mapEntry("595068606", entry);
+    const review = mapEntry("595068606", entry as FeedEntry);
     expect(review).not.toBeNull();
     expect(review!.version).toBeNull();
   });
 
   test("returns null for entry with non-numeric rating", () => {
     const entry = { ...rssEntry(), "im:rating": { label: "not-a-number" } };
-    const result = mapEntry("595068606", entry);
+    const result = mapEntry("595068606", entry as FeedEntry);
     expect(result).toBeNull();
   });
 });
@@ -70,7 +79,11 @@ describe("mapFeedPage", () => {
   });
 
   test("skips metadata entry when includeMetadata: true", () => {
-    const json = rssPage({ appId: "595068606", entries: [{ id: "10", rating: 4 }], includeMetadata: true });
+    const json = rssPage({
+      appId: "595068606",
+      entries: [{ id: "10", rating: 4 }],
+      includeMetadata: true,
+    });
     const reviews = mapFeedPage("595068606", json);
     // metadata entry has no im:rating, should be filtered
     expect(reviews).toHaveLength(1);

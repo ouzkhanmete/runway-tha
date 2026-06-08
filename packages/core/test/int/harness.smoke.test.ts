@@ -1,4 +1,4 @@
-import { test, expect, beforeAll } from "bun:test";
+import { beforeAll, expect, test } from "bun:test";
 import { sql } from "drizzle-orm";
 import { ensureMigrated, getTestDb, truncateAll } from "../helpers/test-db";
 

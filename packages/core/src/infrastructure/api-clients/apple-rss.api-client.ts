@@ -1,10 +1,16 @@
-import type { ReviewFeedClient } from "../../application/ports/review-feed-client";
-import type { Review } from "../../domain/review";
-import { mapFeedPage } from "./review-mapper";
-import type { FeedJson } from "./feed-types";
+import type { ReviewFeedClient } from "@packages/core/application/api-clients/review-feed.api-client";
+import type { Review } from "@packages/core/domain/review";
+import { mapFeedPage } from "./apple-rss.mapper";
+import type { FeedJson } from "./apple-rss.types";
 
-interface AppStoreFeedClientDeps {
-  fetch: typeof globalThis.fetch;
+/**
+ * Narrowed fetch dependency: only the call shape we use. The full `typeof fetch`
+ * additionally requires a `preconnect` property that test doubles lack.
+ */
+export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+interface AppleRssApiClientDeps {
+  fetch: FetchLike;
   baseUrl: string;
   maxPages: number;
   maxRetries: number;
@@ -18,16 +24,16 @@ function isRetryable(status: number): boolean {
   return RETRYABLE_STATUSES.has(status) || status >= 500;
 }
 
-export class AppStoreFeedClient implements ReviewFeedClient {
+export class AppleRssApiClient implements ReviewFeedClient {
   private readonly sleep: (ms: number) => Promise<void>;
 
-  constructor(private deps: AppStoreFeedClientDeps) {
+  constructor(private deps: AppleRssApiClientDeps) {
     this.sleep = deps.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   async fetchAllPages(
     appId: string,
-    country: string
+    country: string,
   ): Promise<{ reviews: Review[]; pagesFetched: number }> {
     const allReviews: Review[] = [];
     let pagesFetched = 0;

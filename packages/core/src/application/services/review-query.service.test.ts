@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { ReviewQueryService } from "../../src/application/services/review-query.service";
-import type { Review } from "../../src/domain/review";
+import { describe, expect, test } from "bun:test";
+import type { Review } from "@packages/core/domain/review";
+import { ReviewQueryService } from "./review-query.service";
 
 function makeTestReview(id: string, submittedAt: Date): Review {
   return {
