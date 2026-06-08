@@ -1,0 +1,35 @@
+# Interaction Log
+
+This file documents how the project was built with **Claude Code**. Each entry is a user prompt (the **input**) followed by a brief summary of **what changed** that turn. It is part of the deliverable: a transparent, human-in-the-loop record of the AI-assisted workflow.
+
+> Convention: one entry per meaningful turn; every turn also produces a single conventional commit to `main`.
+
+---
+
+## Turn 1 — Planning & Design (2026-06-08)
+
+**Prompt (the original brief):**
+
+> We are going to build a solution for a take-home-assessment. This is a demo only, no deployment, no github actions/workflows, everything is running locally. Build with Claude Code so Claude.md is required. Also a `docs/` folder explaining how parts of the system work, mapped onto CLAUDE.md as a table (file · why · when). Dump every prompt + a brief summary of changes into `INTERACTION.md`, this prompt included as the first.
+>
+> 1. **Requirements** — the hard requirements doc (Recent iOS App Store reviews viewer).
+> 2. **Tech stack** — BE: Bun + TS + Hono, Postgres (latest, 18), an ORM that is not Prisma (Drizzle). Patterns: composition root + native-constructor DI, repository pattern for DB access, Zod DTOs on the API layer, clean-architecture-ish layering. FE: React + a state management tool (TanStack or Zustand), no auth. Bun monorepo with a shared package.
+> 3. **Infra** — docker-compose: local infra, test infra (separate port), and full dockerized setup.
+> 4. **Test coverage** — Bun's native runner: unit for pure fns, mocked-network for 3rd-party requests, unit/int for services, **integration with a real dockerized DB for repositories**, plus e2e for the API contract.
+> 5. **API design** — explore the RSS feed (pagination?), consider an ETL job parsing the feed regularly with our DB as the source of truth.
+> 6. **Git** — conventional commits (no scope), an INTERACTION.md entry + commit per turn straight to `main`, initialize the existing empty GitHub repo via `gh`.
+>
+> Follow-up refinements in the same planning session:
+> 1. git-ignore `docs/superpowers`.
+> 2. Make the worker **table-driven**: read `apps ⨝ sync_runs`, find apps with no successful run inside the staleness window; onboarding an app = a single insert that the next worker batch picks up.
+> 3. Worker always fetches all **10 pages**.
+> 4. Investigate the RSS feed's rate limits and compute load for 10 apps × 10 pages.
+
+**Decisions reached (via brainstorming):** multi-app via config seed **+ `POST /apps` create-only** registration and an FE selector; ETL lives in a **separate `worker` app**; time window **configurable (default 48h)** with an FE picker (48h / 7d / 30d); **worker is the sole writer of reviews** (API only reads reviews and writes the `apps` row).
+
+**What changed this turn:**
+- Used the **brainstorming** skill to turn the brief into an approved design.
+- **Explored the App Store RSS feed empirically:** JSON feed, 50 reviews/page × max 10 pages (≈500 most-recent), stable review `id` (dedup/idempotency key), field mapping, and the "newest live review is days old" reality that motivates a configurable window.
+- **Probed rate limits:** no published limits, Akamai-edge-cached; 70 requests (40 sequential + 30 concurrent) with 0 throttling; worst-case load ≈ 0.11 req/s (400 req/hr) for 10 apps × 10 pages — ~400× under demonstrated-safe throughput.
+- Wrote the **design spec** to `docs/superpowers/specs/2026-06-08-app-store-reviews-viewer-design.md` (git-ignored working artifact).
+- **Initialized the repository:** `.gitignore`, `README.md`, this log, and an initial `CLAUDE.md`; first commit pushed to `main` on `git@github.com:ouzkhanmete/runway-tha.git`.
