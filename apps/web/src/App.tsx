@@ -38,6 +38,7 @@ export function App() {
     fetchNextPage,
   } = useReviews(selectedAppId, windowHours, { pollUntilData: awaitingFirstSync });
   const reviews = reviewPages?.pages.flatMap((page) => page.items);
+  const selectedApp = apps?.find((a) => a.id === selectedAppId);
 
   // Stop waiting once the first reviews arrive for the pending app.
   useEffect(() => {
@@ -81,6 +82,9 @@ export function App() {
 
         <WindowPicker value={windowHours} onChange={setWindowHours} />
       </div>
+
+      {/* The selected app's name, once the worker has resolved it (skipped if unknown). */}
+      {selectedApp?.name && <h2 className="app-title">{selectedApp.name}</h2>}
 
       <ReviewList
         reviews={reviews}

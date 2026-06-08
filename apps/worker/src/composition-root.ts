@@ -3,6 +3,7 @@ import {
   createDb,
   createRepositories,
   IngestReviewsService,
+  ItunesLookupApiClient,
   loadEnv,
   SyncSchedulerService,
 } from "@packages/core/index";
@@ -26,9 +27,16 @@ export function buildWorker() {
     syncRuns: repos.syncRuns,
   });
 
+  // The reviews feed has no app name; the worker backfills it from the lookup API.
+  const appMetadata = new ItunesLookupApiClient({
+    fetch: globalThis.fetch,
+    baseUrl: env.FEED_BASE_URL,
+  });
+
   const scheduler = new SyncSchedulerService({
     apps: repos.apps,
     ingest,
+    appMetadata,
     stalenessMs: env.WORKER_STALENESS_MS,
     claimTtlMs: env.WORKER_CLAIM_TTL_MS,
     concurrency: env.WORKER_CONCURRENCY,

@@ -3,6 +3,7 @@
 // Re-export Country from shared for convenience
 export { Country } from "@packages/shared/index";
 // Application api-client interfaces
+export * from "./application/api-clients/app-metadata.api-client";
 export * from "./application/api-clients/review-feed.api-client";
 export * from "./application/repositories/app.repository";
 // Application repository interfaces
@@ -24,9 +25,9 @@ export * from "./domain/sync-run";
 export * from "./domain/sync-status";
 export * from "./infrastructure/api-clients/apple-rss.api-client";
 export * from "./infrastructure/api-clients/apple-rss.mapper";
-
 // Infrastructure: Apple RSS api-client
 export * from "./infrastructure/api-clients/apple-rss.types";
+export * from "./infrastructure/api-clients/itunes-lookup.api-client";
 // DB infrastructure
 export * from "./infrastructure/db/client";
 export * as schema from "./infrastructure/db/schema";

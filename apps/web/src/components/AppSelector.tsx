@@ -26,7 +26,9 @@ export function AppSelector({ apps, value, onChange }: AppSelectorProps) {
       >
         {apps.map((app) => (
           <option key={app.id} value={app.id}>
-            {app.name ?? app.id} ({app.country.toUpperCase()}){app.claimedAt ? " · syncing…" : ""}
+            {/* Once the worker has filled the name, show "Name (id)"; until then, just the id. */}
+            {app.name ? `${app.name} (${app.id})` : app.id}
+            {app.claimedAt ? " · syncing…" : ""}
           </option>
         ))}
       </select>
