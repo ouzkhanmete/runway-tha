@@ -30,16 +30,18 @@ Services and their startup order:
 ```
 postgres (healthy)
   └── migrate (runs once, exits 0)
-        ├── worker (long-running; polls apps table)
-        └── api   (long-running; published on host port 3001)
-              └── web (vite preview; published on host port 5173)
+        └── seed (runs once, exits 0 — inserts top-app ids)
+              ├── worker (long-running; polls apps table)
+              └── api   (long-running; published on host port 3001)
+                    └── web (vite preview; published on host port 5173)
 ```
 
 | Service | Image | Host port | Notes |
 |---|---|---|---|
 | `postgres` | `postgres:18` | `5434` | Bind-mounted to `./.data/postgres-full` (separate from the dev DB) |
 | `migrate` | `backend.Dockerfile` | — | Runs `bun run --cwd packages/core migrate`; exits after completion |
-| `worker` | `backend.Dockerfile` | — | `bun run --cwd apps/worker start`; polls `apps` table — no seeding |
+| `seed` | `backend.Dockerfile` | — | `bun run --cwd packages/core seed`; inserts current US top-free app **ids** (idempotent), then exits. Worker/api wait for it. |
+| `worker` | `backend.Dockerfile` | — | `bun run --cwd apps/worker start`; polls `apps` table — the worker itself never seeds |
 | `api` | `backend.Dockerfile` | `3001` | `bun run --cwd apps/api start`; internal port `3000` |
 | `web` | `frontend.Dockerfile` | `5173` | Vite preview (pre-built); proxies `/api` to `http://api:3000` |
 

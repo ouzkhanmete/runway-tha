@@ -36,6 +36,14 @@ The API and worker share the same Postgres instance but have strict role separat
 
 Adding a new app to track requires only one INSERT (via `POST /apps`). The worker's `claimDueForSync` query discovers it automatically on the next tick without any configuration reload or restart. This is the table-driven pattern: the database is the source of truth for which apps to process.
 
+### App name from the iTunes Lookup API; apps stored id-first
+
+The customer-reviews RSS feed the worker already calls does **not** include the app's name, so a separate source is needed. We use the **iTunes Lookup API** (`/lookup?id=…` → `trackName`) and let the **worker** backfill `apps.name` once per app, the same place it ingests reviews. This keeps a single rule everywhere — *register an id, the worker resolves the name* — so manual `POST /apps`, the form, and the top-apps seed all behave identically (they store id-only). The lookup is best-effort: a failure just leaves `name = null` and is retried next tick, and the UI degrades to showing the id. (The top-apps RSS *does* carry names, but seeding them there would create a second name source and a divergence between seeded and manually-added apps for no real benefit; the name appears within a tick regardless.)
+
+### Seeding via a one-shot container, gated before the app services
+
+The full-stack demo pre-populates the current top-free apps so a reviewer sees data immediately. This runs as a dedicated `seed` service that completes **before** the worker/api start (compose `depends_on … service_completed_successfully`), rather than inside the worker — keeping the worker a pure reader and making "the DB is seeded" an explicit, ordered startup step. It's idempotent (skips existing ids) and never blocks startup if the feed is down.
+
 ### Database-enforced claim over an external queue
 
 The worker uses a Postgres claim (`apps.claimed_at` + `UPDATE … FOR UPDATE SKIP LOCKED`) to coordinate multiple instances, rather than introducing a job queue (Redis/SQS/etc.). Rationale: the database is already the source of truth and is already a dependency, the work-set is small (one row per tracked app), and `SKIP LOCKED` is the canonical, well-understood Postgres idiom for exactly-once-ish job claiming. This keeps the system single-dependency and the claim logic colocated with the data it guards. The lease is advisory for *efficiency* (avoiding duplicate fetches); idempotent upserts mean *correctness* never depends on it. A dedicated queue would add operational surface for no benefit at this scale. See [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease).

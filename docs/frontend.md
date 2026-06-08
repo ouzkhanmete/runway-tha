@@ -39,7 +39,7 @@ A module-level singleton `apiClient = createApiClient()` is used by all hooks. T
 
 | Hook | Query key | Behaviour |
 |---|---|---|
-| `useApps()` | `["apps"]` | Fetches on mount; no polling |
+| `useApps()` | `["apps"]` | Fetches on mount; **polls every 5s while any app's `name` is still null** (just seeded/added, not yet enriched by the worker), then stops — so names appear automatically |
 | `useReviews(appId, windowHours)` | `["reviews", appId, windowHours]` | **`useInfiniteQuery`** — cursor pagination (5/page); `getNextPageParam` reads `nextCursor`; disabled until `appId` is defined |
 | `useRegisterApp()` | — (mutation) | On success, invalidates `["apps"]` to refresh the app list |
 
@@ -56,7 +56,9 @@ Root component. State:
 
 `useQueryParam` keeps the URL logic in pure helpers (`readParam`, `buildParamUrl`) that are unit-tested directly; the hook itself is thin glue over `window.history` + a `popstate` listener.
 
-Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`) and the `ReviewList`.
+Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`), the selected app's **name as an `<h2>` heading** (when the worker has resolved it; skipped while still null), and the `ReviewList`.
+
+The `AppSelector` dropdown labels each option `"{name} ({id})"` once the name is known, falling back to just the id until then (plus a "· syncing…" hint while the app is being fetched).
 
 ### `AddAppForm`
 

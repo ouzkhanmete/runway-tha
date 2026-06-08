@@ -64,7 +64,12 @@ Within each tick, `SyncSchedulerService.runDueOnce()`:
    - Calls `AppleRssApiClient.fetchAllPages` — always fetches pages 1–10 (stops early only if a page returns 0 entries).
    - Upserts all collected reviews (`reviewRepo.upsertMany`).
    - Closes the `sync_run` with `status: "success"` and counts, or `status: "error"` with the error message. The run record is always closed, even on failure.
-5. After each app finishes (success **or** error), the scheduler calls `AppRepository.releaseClaim(app.id)` to clear the lease. A failed app increments `failed` but does not stop other apps from being processed.
+5. **Name backfill** — once per app (only while `apps.name` is null), the scheduler resolves the display name from the iTunes Lookup API and stores it. See [App name enrichment](#app-name-enrichment).
+6. After each app finishes (success **or** error), the scheduler calls `AppRepository.releaseClaim(app.id)` to clear the lease. A failed app increments `failed` but does not stop other apps from being processed.
+
+### App name enrichment
+
+The customer-reviews RSS feed used for ingestion **does not carry the app name** (`feed.title` is the generic `"iTunes Store: Customer Reviews"`). So apps are registered with `name = null` (a single `POST /apps` or the seed inserts just the id), and the worker backfills the name from the **iTunes Lookup API** — `GET /lookup?id={appId}&country={country}` → `results[0].trackName` — via `ItunesLookupApiClient` (`AppMetadataClient` port). The scheduler does this once per app, only while the name is null, in the same tick that ingests its reviews. It is **best-effort**: any failure (network, non-2xx, no result) leaves the name null and never fails the tick, and `name` is re-attempted on the next time the app is due. This is why a freshly added app first shows its id in the UI, then its name a moment later.
 
 ### Multi-worker safety: the claim lease
 
@@ -97,9 +102,14 @@ The lease is released (`claimed_at → NULL`) when the sync finishes. If a worke
 
 The Apple feed provides only the ~500 most-recent reviews — there is no pagination state or cursor to maintain. Fetching all pages each sync is cheap (≤ 10 requests) and keeps the local DB consistent with Apple's feed without needing any watermark or change-detection logic. Combined with upsert idempotency, repeated full fetches are safe.
 
-### No startup seeding
+### The worker doesn't seed — a dedicated step does
 
-The worker is a **pure reader** of the `apps` table. It does not seed or register any apps on startup. Apps are onboarded exclusively via `POST /apps` (API) or the "Add app" form in the web UI. Once an app row exists, the worker picks it up automatically on its next tick.
+The worker itself is a **pure reader** of the `apps` table; it never registers apps. Apps get into the table three ways, all of which the worker discovers on its next tick:
+
+- `POST /apps` (API) or the "Add app" form in the web UI — one row, id only.
+- The **seed step** in the full-stack compose — a one-shot `seed` container (`bun run --cwd packages/core seed`, source `packages/core/src/scripts/seed-top-apps.ts`) that fetches the current US top-free apps (`…/rss/topfreeapplications/limit=10/json`) and inserts their **ids only** (idempotent — already-tracked apps are skipped). It runs once after `migrate` and **before** the worker/api start, so the worker has work to do on first boot and the UI is pre-populated. If the feed is unreachable the seed exits 0 (never blocks startup); apps can still be added manually.
+
+In every case only the id is stored; the worker fills the name on first ingest (see [App name enrichment](#app-name-enrichment)).
 
 ## HTTP retry and backoff
 
