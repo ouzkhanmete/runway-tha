@@ -1,6 +1,7 @@
 import type { ReviewFeedClient } from "../../application/ports/review-feed-client";
 import type { Review } from "../../domain/review";
 import { mapFeedPage } from "./review-mapper";
+import type { FeedJson } from "./feed-types";
 
 interface AppStoreFeedClientDeps {
   fetch: typeof globalThis.fetch;
@@ -36,7 +37,7 @@ export class AppStoreFeedClient implements ReviewFeedClient {
       const json = await this.fetchPageWithRetry(url);
       pagesFetched++;
 
-      const reviews = mapFeedPage(appId, json);
+      const reviews = mapFeedPage(appId, json as FeedJson);
       allReviews.push(...reviews);
 
       if (reviews.length === 0) {

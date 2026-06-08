@@ -1,27 +1,35 @@
 import type { Review } from "../../domain/review";
 import type { Rating } from "../../domain/rating";
+import type { FeedEntry, FeedJson } from "./feed-types";
 
 /**
  * Map a single raw feed entry to a Review domain object.
- * Returns null if the entry is a metadata entry (no `im:rating`) or has an
- * invalid rating.
+ * Returns null if the entry is a metadata entry (no `im:rating`), has an
+ * invalid rating, or is missing the required `id`/`updated` fields.
  */
-export function mapEntry(appId: string, e: any): Review | null {
+export function mapEntry(appId: string, e: FeedEntry): Review | null {
   const ratingRaw = e?.["im:rating"]?.label;
   if (ratingRaw == null) return null; // skip metadata entry
 
   const rating = parseInt(ratingRaw, 10);
   if (Number.isNaN(rating)) return null;
 
+  // Defensively skip malformed entries missing required fields.
+  const id = e.id?.label;
+  const updatedRaw = e.updated?.label;
+  if (!id || !updatedRaw) return null;
+  const submittedAt = new Date(updatedRaw);
+  if (Number.isNaN(submittedAt.getTime())) return null;
+
   return {
-    id: String(e.id.label),
+    id: String(id),
     appId,
     author: e.author?.name?.label ?? "",
     title: e.title?.label ?? "",
     content: e.content?.label ?? "",
     rating: rating as Rating,
     version: e["im:version"]?.label ?? null,
-    submittedAt: new Date(e.updated.label),
+    submittedAt,
   };
 }
 
@@ -30,9 +38,9 @@ export function mapEntry(appId: string, e: any): Review | null {
  * Handles the case where `entry` is absent, an array, or a single object
  * (Apple returns a single object instead of an array when only one review exists).
  */
-export function mapFeedPage(appId: string, json: any): Review[] {
+export function mapFeedPage(appId: string, json: FeedJson): Review[] {
   const raw = json?.feed?.entry;
-  const entries: any[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const entries: FeedEntry[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
   return entries
     .map((e) => mapEntry(appId, e))
     .filter((r): r is Review => r !== null);
