@@ -1,4 +1,4 @@
-import { sql, eq, desc } from "drizzle-orm";
+import { sql, eq, and, gte, desc } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { schema } from "../db/client";
 import type { ReviewRepository } from "../../application/ports/review-repository";
@@ -47,12 +47,10 @@ export class DrizzleReviewRepository implements ReviewRepository {
     const rows = await this.db
       .select()
       .from(reviews)
-      .where(eq(reviews.appId, appId))
+      .where(and(eq(reviews.appId, appId), gte(reviews.submittedAt, since)))
       .orderBy(desc(reviews.submittedAt));
 
-    return rows
-      .filter((r) => r.submittedAt >= since)
-      .map((r) => ({
+    return rows.map((r) => ({
         id: r.id,
         appId: r.appId,
         author: r.author,
