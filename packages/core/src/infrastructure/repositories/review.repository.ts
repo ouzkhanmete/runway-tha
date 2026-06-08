@@ -1,4 +1,8 @@
-import type { ReviewRepository } from "@packages/core/application/repositories/review.repository";
+import type {
+  ReviewCursor,
+  ReviewRepository,
+  ReviewsPage,
+} from "@packages/core/application/repositories/review.repository";
 import type { Rating } from "@packages/core/domain/rating";
 import type { Review } from "@packages/core/domain/review";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
@@ -43,22 +47,51 @@ export class DrizzleReviewRepository implements ReviewRepository {
     return items.length;
   }
 
-  async findRecent(appId: string, since: Date): Promise<Review[]> {
+  async findRecentPage(
+    appId: string,
+    since: Date,
+    opts: { limit: number; cursor?: ReviewCursor | null },
+  ): Promise<ReviewsPage> {
+    const { limit, cursor } = opts;
+
+    const conds = [eq(reviews.appId, appId), gte(reviews.submittedAt, since)];
+    // Keyset: only rows strictly "older" than the cursor in (submitted_at DESC, id DESC)
+    // order. The row-value comparison `(a, b) < (c, d)` is evaluated element-wise by
+    // Postgres, so `id` only breaks ties when timestamps are equal.
+    if (cursor) {
+      conds.push(
+        sql`(${reviews.submittedAt}, ${reviews.id}) < (${cursor.submittedAt}, ${cursor.id})`,
+      );
+    }
+
+    // Fetch one extra row to know whether a further page exists, without a COUNT.
     const rows = await this.db
       .select()
       .from(reviews)
-      .where(and(eq(reviews.appId, appId), gte(reviews.submittedAt, since)))
-      .orderBy(desc(reviews.submittedAt));
+      .where(and(...conds))
+      .orderBy(desc(reviews.submittedAt), desc(reviews.id))
+      .limit(limit + 1);
 
-    return rows.map((r) => ({
-      id: r.id,
-      appId: r.appId,
-      author: r.author,
-      title: r.title,
-      content: r.content,
-      rating: r.rating as Rating,
-      version: r.version,
-      submittedAt: r.submittedAt,
-    }));
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit).map(toReview);
+    const last = items[items.length - 1];
+
+    return {
+      items,
+      nextCursor: hasMore && last ? { submittedAt: last.submittedAt, id: last.id } : null,
+    };
   }
+}
+
+function toReview(r: typeof reviews.$inferSelect): Review {
+  return {
+    id: r.id,
+    appId: r.appId,
+    author: r.author,
+    title: r.title,
+    content: r.content,
+    rating: r.rating as Rating,
+    version: r.version,
+    submittedAt: r.submittedAt,
+  };
 }

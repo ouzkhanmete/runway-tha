@@ -25,6 +25,31 @@ async function seedApp() {
   return repos.apps.create({ id: APP_ID, country: Country.US });
 }
 
+function appWithClock(now: Date) {
+  const reviewQueryWithClock = new ReviewQueryService({ reviews: repos.reviews, clock: () => now });
+  return createApp({
+    reviewQuery: reviewQueryWithClock,
+    registry: new AppRegistryService({ apps: repos.apps }),
+    reviewsQuerySchema,
+  });
+}
+
+/** Seed `n` in-window reviews (within 720h of NOW), strictly newest-first by id m1…mn. */
+async function seedManyReviews(n: number) {
+  const items = Array.from({ length: n }, (_, i) => ({
+    id: `m${i + 1}`,
+    appId: APP_ID,
+    author: `Author ${i + 1}`,
+    title: `Review ${i + 1}`,
+    content: "body",
+    rating: 5 as const,
+    version: "1.0",
+    submittedAt: new Date(NOW.getTime() - (i + 1) * 3600_000), // i+1 hours before NOW
+  }));
+  await repos.reviews.upsertMany(items);
+  return items;
+}
+
 async function seedReviews() {
   // In-window (within 48h from NOW)
   const inWindow = [
@@ -67,73 +92,93 @@ async function seedReviews() {
 }
 
 describe("GET /apps/:appId/reviews", () => {
-  test("200 returns only in-window reviews, newest-first, valid ReviewDtos", async () => {
+  test("200 returns a page of in-window reviews, newest-first, valid ReviewDtos", async () => {
     await seedApp();
     const { inWindow } = await seedReviews();
 
-    // Use a fixed clock so we know exactly what's "within 48h"
-    const reviewQueryWithClock = new ReviewQueryService({
-      reviews: repos.reviews,
-      clock: () => NOW,
-    });
-    const registryFixed = new AppRegistryService({ apps: repos.apps });
-    const appFixed = createApp({
-      reviewQuery: reviewQueryWithClock,
-      registry: registryFixed,
-      reviewsQuerySchema,
-    });
-
-    const res = await appFixed.request(`/apps/${APP_ID}/reviews?windowHours=48`);
+    // Fixed clock so we know exactly what's "within 48h"
+    const res = await appWithClock(NOW).request(`/apps/${APP_ID}/reviews?windowHours=48`);
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(inWindow.length);
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.items).toHaveLength(inWindow.length);
+    expect(body.nextCursor).toBeNull(); // 2 items fit on the default 5-item page
 
-    // Validate each item against schema
-    for (const item of body) {
+    for (const item of body.items) {
       expect(() => ReviewDtoSchema.parse(item)).not.toThrow();
-      expect(typeof item.content).toBe("string");
-      expect(typeof item.author).toBe("string");
-      expect(typeof item.submittedAt).toBe("string");
-      expect([1, 2, 3, 4, 5]).toContain(item.rating);
     }
 
-    // Verify newest-first ordering
-    const dates = body.map((r: { submittedAt: string }) => new Date(r.submittedAt).getTime());
+    // Newest-first ordering
+    const dates = body.items.map((r: { submittedAt: string }) => new Date(r.submittedAt).getTime());
     for (let i = 0; i < dates.length - 1; i++) {
       expect(dates[i]).toBeGreaterThanOrEqual(dates[i + 1]);
     }
 
-    // Verify the old review is not included
-    const ids = body.map((r: { id: string }) => r.id);
-    expect(ids).not.toContain("r3");
+    const ids = body.items.map((r: { id: string }) => r.id);
+    expect(ids).not.toContain("r3"); // out-of-window
     expect(ids).toContain("r1");
     expect(ids).toContain("r2");
   });
 
-  test("400 when windowHours is unsupported value", async () => {
+  test("paginates with the cursor: a full page then the remainder, no overlap", async () => {
     await seedApp();
+    await seedManyReviews(7);
+    const appFixed = appWithClock(NOW);
 
+    const res1 = await appFixed.request(`/apps/${APP_ID}/reviews?windowHours=720`);
+    const page1 = await res1.json();
+    expect(page1.items).toHaveLength(5); // default page size
+    expect(page1.nextCursor).not.toBeNull();
+
+    const res2 = await appFixed.request(
+      `/apps/${APP_ID}/reviews?windowHours=720&cursor=${encodeURIComponent(page1.nextCursor)}`,
+    );
+    const page2 = await res2.json();
+    expect(page2.items).toHaveLength(2);
+    expect(page2.nextCursor).toBeNull();
+
+    const ids1 = page1.items.map((r: { id: string }) => r.id);
+    const ids2 = page2.items.map((r: { id: string }) => r.id);
+    expect(ids1.filter((id: string) => ids2.includes(id))).toHaveLength(0); // disjoint pages
+    expect([...ids1, ...ids2]).toEqual(["m1", "m2", "m3", "m4", "m5", "m6", "m7"]); // full, in order
+  });
+
+  test("respects an explicit limit", async () => {
+    await seedApp();
+    await seedManyReviews(7);
+    const res = await appWithClock(NOW).request(`/apps/${APP_ID}/reviews?windowHours=720&limit=3`);
+    const page = await res.json();
+    expect(page.items).toHaveLength(3);
+    expect(page.nextCursor).not.toBeNull();
+  });
+
+  test("400 when windowHours is out of range", async () => {
+    await seedApp();
     const res = await app.request(`/apps/${APP_ID}/reviews?windowHours=99999`);
     expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error.code).toBe("VALIDATION");
+    expect((await res.json()).error.code).toBe("VALIDATION");
+  });
+
+  test("400 when the cursor is malformed", async () => {
+    await seedApp();
+    const res = await app.request(
+      `/apps/${APP_ID}/reviews?windowHours=48&cursor=not-a-real-cursor`,
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("VALIDATION");
   });
 
   test("404 for unregistered app", async () => {
     const res = await app.request("/apps/999999999/reviews?windowHours=48");
     expect(res.status).toBe(404);
-    const body = await res.json();
-    expect(body.error.code).toBe("NOT_FOUND");
+    expect((await res.json()).error.code).toBe("NOT_FOUND");
   });
 
-  test("200 with empty array when app has no reviews", async () => {
+  test("200 with an empty page when the app has no reviews", async () => {
     await seedApp();
-
     const res = await app.request(`/apps/${APP_ID}/reviews?windowHours=48`);
     expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toEqual([]);
+    expect(await res.json()).toEqual({ items: [], nextCursor: null });
   });
 });

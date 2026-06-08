@@ -59,10 +59,11 @@ describe("ReviewRepository", () => {
     });
   });
 
-  describe("findRecent", () => {
-    test("returns only rows with submittedAt >= since, ordered newest-first", async () => {
+  describe("findRecentPage", () => {
+    const SINCE = new Date("2026-06-01T00:00:00Z");
+
+    test("returns only rows with submittedAt >= since, newest-first", async () => {
       await seedApp();
-      const since = new Date("2026-06-01T00:00:00Z");
       const old = makeReview({
         id: "old",
         appId: "595068606",
@@ -80,38 +81,79 @@ describe("ReviewRepository", () => {
       });
       await reviews.upsertMany([old, recent1, recent2]);
 
-      const result = await reviews.findRecent("595068606", since);
-      expect(result).toHaveLength(2);
-      // Newest first
-      expect(result[0].id).toBe("r2");
-      expect(result[1].id).toBe("r1");
+      const page = await reviews.findRecentPage("595068606", SINCE, { limit: 10 });
+      expect(page.items.map((r) => r.id)).toEqual(["r2", "r1"]); // newest first, old excluded
+      expect(page.nextCursor).toBeNull(); // everything fit on one page
     });
 
-    test("returns empty array when no reviews in window", async () => {
+    test("empty page when no reviews in window", async () => {
       await seedApp();
-      const result = await reviews.findRecent("595068606", new Date("2026-06-01T00:00:00Z"));
-      expect(result).toHaveLength(0);
+      const page = await reviews.findRecentPage("595068606", SINCE, { limit: 5 });
+      expect(page.items).toHaveLength(0);
+      expect(page.nextCursor).toBeNull();
     });
 
-    test("submittedAt is a Date instance", async () => {
+    test("submittedAt is a Date instance and rating is a number", async () => {
       await seedApp();
-      const r = makeReview({
-        id: "date-test",
-        appId: "595068606",
-        submittedAt: new Date("2026-06-05T00:00:00Z"),
+      await reviews.upsertMany([
+        makeReview({
+          id: "t1",
+          appId: "595068606",
+          rating: 3,
+          submittedAt: new Date("2026-06-05T00:00:00Z"),
+        }),
+      ]);
+      const page = await reviews.findRecentPage("595068606", SINCE, { limit: 5 });
+      expect(page.items[0].submittedAt).toBeInstanceOf(Date);
+      expect(typeof page.items[0].rating).toBe("number");
+      expect(page.items[0].rating).toBe(3);
+    });
+
+    test("walks all reviews across pages via the cursor with no gaps or repeats", async () => {
+      await seedApp();
+      // 7 reviews, strictly descending timestamps p1 (newest) … p7 (oldest).
+      const seeded = Array.from({ length: 7 }, (_, i) =>
+        makeReview({
+          id: `p${i + 1}`,
+          appId: "595068606",
+          submittedAt: new Date(`2026-06-07T${String(7 - i).padStart(2, "0")}:00:00Z`),
+        }),
+      );
+      await reviews.upsertMany(seeded);
+
+      const collected: string[] = [];
+      let cursor = null as Awaited<ReturnType<typeof reviews.findRecentPage>>["nextCursor"];
+      let pages = 0;
+      do {
+        const page = await reviews.findRecentPage("595068606", SINCE, { limit: 3, cursor });
+        collected.push(...page.items.map((r) => r.id));
+        cursor = page.nextCursor;
+        pages++;
+      } while (cursor && pages < 10);
+
+      // 3 pages: 3 + 3 + 1, in strict newest-first order, every id exactly once.
+      expect(pages).toBe(3);
+      expect(collected).toEqual(["p1", "p2", "p3", "p4", "p5", "p6", "p7"]);
+    });
+
+    test("breaks ties on id so equal timestamps paginate deterministically", async () => {
+      await seedApp();
+      const ts = new Date("2026-06-05T00:00:00Z");
+      await reviews.upsertMany([
+        makeReview({ id: "a", appId: "595068606", submittedAt: ts }),
+        makeReview({ id: "b", appId: "595068606", submittedAt: ts }),
+      ]);
+
+      const page1 = await reviews.findRecentPage("595068606", SINCE, { limit: 1 });
+      expect(page1.items.map((r) => r.id)).toEqual(["b"]); // id DESC breaks the tie
+      expect(page1.nextCursor).not.toBeNull();
+
+      const page2 = await reviews.findRecentPage("595068606", SINCE, {
+        limit: 1,
+        cursor: page1.nextCursor,
       });
-      await reviews.upsertMany([r]);
-      const result = await reviews.findRecent("595068606", new Date("2026-06-04T00:00:00Z"));
-      expect(result[0].submittedAt).toBeInstanceOf(Date);
-    });
-
-    test("rating is cast to number", async () => {
-      await seedApp();
-      const r = makeReview({ id: "rating-test", appId: "595068606", rating: 3 });
-      await reviews.upsertMany([r]);
-      const result = await reviews.findRecent("595068606", new Date("2020-01-01T00:00:00Z"));
-      expect(typeof result[0].rating).toBe("number");
-      expect(result[0].rating).toBe(3);
+      expect(page2.items.map((r) => r.id)).toEqual(["a"]); // no skip, no repeat
+      expect(page2.nextCursor).toBeNull();
     });
   });
 });

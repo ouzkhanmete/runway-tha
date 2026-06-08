@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "reviews_app_submitted_idx";--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS "reviews_app_submitted_idx" ON "reviews" USING btree ("app_id","submitted_at" DESC NULLS LAST,"id" DESC NULLS LAST);

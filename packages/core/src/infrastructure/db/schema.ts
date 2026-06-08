@@ -24,7 +24,10 @@ export const reviews = pgTable(
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull(),
     fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("reviews_app_submitted_idx").on(t.appId, t.submittedAt.desc())],
+  // (app_id, submitted_at DESC, id DESC) — serves the window filter, the newest-first
+  // ordering, AND the keyset cursor predicate `(submitted_at, id) < (?, ?)` as one
+  // indexed range scan (the trailing id makes the order total / the cursor stable).
+  (t) => [index("reviews_app_submitted_idx").on(t.appId, t.submittedAt.desc(), t.id.desc())],
 );
 export const syncRuns = pgTable(
   "sync_runs",

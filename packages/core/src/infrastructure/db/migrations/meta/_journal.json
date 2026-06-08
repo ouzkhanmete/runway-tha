@@ -15,6 +15,13 @@
       "when": 1780932793365,
       "tag": "0001_lively_human_robot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780937415242,
+      "tag": "0002_glossy_frog_thor",
+      "breakpoints": true
     }
   ]
 }

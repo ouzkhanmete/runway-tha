@@ -1,4 +1,4 @@
-import { NotFoundError } from "@packages/core/index";
+import { NotFoundError, ValidationError } from "@packages/core/index";
 import type { Context } from "hono";
 import { ZodError } from "zod";
 
@@ -10,6 +10,18 @@ export function errorHandler(err: unknown, c: Context) {
           code: "VALIDATION",
           message: "Invalid request",
           details: err.issues,
+        },
+      },
+      400,
+    );
+  }
+
+  if (err instanceof ValidationError) {
+    return c.json(
+      {
+        error: {
+          code: "VALIDATION",
+          message: err.message,
         },
       },
       400,

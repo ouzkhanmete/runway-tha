@@ -40,6 +40,10 @@ Adding a new app to track requires only one INSERT (via `POST /apps`). The worke
 
 The worker uses a Postgres claim (`apps.claimed_at` + `UPDATE … FOR UPDATE SKIP LOCKED`) to coordinate multiple instances, rather than introducing a job queue (Redis/SQS/etc.). Rationale: the database is already the source of truth and is already a dependency, the work-set is small (one row per tracked app), and `SKIP LOCKED` is the canonical, well-understood Postgres idiom for exactly-once-ish job claiming. This keeps the system single-dependency and the claim logic colocated with the data it guards. The lease is advisory for *efficiency* (avoiding duplicate fetches); idempotent upserts mean *correctness* never depends on it. A dedicated queue would add operational surface for no benefit at this scale. See [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease).
 
+### Keyset (cursor) pagination over OFFSET
+
+Reviews are paged with a keyset cursor — `WHERE (submitted_at, id) < (?, ?) ORDER BY submitted_at DESC, id DESC LIMIT n` — rather than `LIMIT/OFFSET`. Two reasons: (1) **performance** — OFFSET makes the database scan and discard all skipped rows, so deep pages get linearly slower; a keyset cursor is always a bounded range scan off the `(app_id, submitted_at DESC, id DESC)` index. (2) **stability** — the feed is continuously ingesting new reviews, and OFFSET would skip or duplicate rows when the underlying set shifts between requests; a keyset anchored to `(submitted_at, id)` returns a consistent, gap-free sequence. The trailing `id` is the tiebreaker that makes the sort order total (timestamps can collide), which is what keeps the cursor unambiguous. The cursor is returned as an opaque base64url token so clients don't depend on its shape.
+
 ### Bun-native SQL driver over `pg`
 
 `drizzle-orm/bun-sql` uses Bun's built-in `SQL` class, which is a first-class Bun API backed by libpq. This removes the need for an npm postgres driver entirely. The trade-off is that the server-side code (packages/core, apps/api, apps/worker) is Bun-only and will not run on Node.

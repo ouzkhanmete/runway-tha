@@ -29,7 +29,7 @@ apps/web/src/
 |---|---|---|
 | `getApps()` | `GET /api/apps` | `AppDto[]` |
 | `registerApp(appId, country?)` | `POST /api/apps` | `AppDto` |
-| `getReviews(appId, windowHours)` | `GET /api/apps/:appId/reviews?windowHours=…` | `ReviewDto[]` |
+| `getReviews(appId, windowHours, cursor?)` | `GET /api/apps/:appId/reviews?windowHours=…&cursor=…` | `ReviewsPageDto` (`{ items, nextCursor }`) |
 
 On non-2xx responses the client parses the `ApiErrorSchema` error envelope and throws with the server's `error.message`; unrecognised bodies throw `"Request failed (${status})"`.
 
@@ -40,8 +40,10 @@ A module-level singleton `apiClient = createApiClient()` is used by all hooks. T
 | Hook | Query key | Behaviour |
 |---|---|---|
 | `useApps()` | `["apps"]` | Fetches on mount; no polling |
-| `useReviews(appId, windowHours)` | `["reviews", appId, windowHours]` | Disabled until `appId` is defined |
+| `useReviews(appId, windowHours)` | `["reviews", appId, windowHours]` | **`useInfiniteQuery`** — cursor pagination (5/page); `getNextPageParam` reads `nextCursor`; disabled until `appId` is defined |
 | `useRegisterApp()` | — (mutation) | On success, invalidates `["apps"]` to refresh the app list |
+
+`useReviews` returns infinite-query data as `data.pages` (each a `ReviewsPageDto`); `App.tsx` flattens them with `pages.flatMap(p => p.items)`. The `ReviewList` renders the flat list plus a sentinel `<div>` watched by an `IntersectionObserver` that calls `fetchNextPage()` when it scrolls into view (200px root margin), showing a "Loading more…" spinner while fetching and "You've reached the end." when `hasNextPage` is false.
 
 ## Components
 

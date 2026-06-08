@@ -98,11 +98,12 @@ describe("full-flow e2e: feed → DB → API", () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body).toHaveLength(FAKE_REVIEWS.length);
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.items).toHaveLength(FAKE_REVIEWS.length);
+    expect(body.nextCursor).toBeNull(); // 3 reviews fit on the default 5-item page
 
     // Each item must conform to ReviewDtoSchema
-    for (const item of body) {
+    for (const item of body.items) {
       expect(() => ReviewDtoSchema.parse(item)).not.toThrow();
       expect(typeof item.id).toBe("string");
       expect(typeof item.author).toBe("string");
@@ -112,13 +113,15 @@ describe("full-flow e2e: feed → DB → API", () => {
     }
 
     // Newest-first ordering
-    const timestamps = body.map((r: { submittedAt: string }) => new Date(r.submittedAt).getTime());
+    const timestamps = body.items.map((r: { submittedAt: string }) =>
+      new Date(r.submittedAt).getTime(),
+    );
     for (let i = 0; i < timestamps.length - 1; i++) {
       expect(timestamps[i]).toBeGreaterThanOrEqual(timestamps[i + 1]);
     }
 
     // All our known IDs must appear
-    const ids = body.map((r: { id: string }) => r.id);
+    const ids = body.items.map((r: { id: string }) => r.id);
     for (const review of FAKE_REVIEWS) {
       expect(ids).toContain(review.id);
     }
@@ -154,6 +157,6 @@ describe("full-flow e2e: feed → DB → API", () => {
     expect(res.status).toBe(200);
 
     const body = await res.json();
-    expect(body).toHaveLength(FAKE_REVIEWS.length); // exactly the same count — no duplicates
+    expect(body.items).toHaveLength(FAKE_REVIEWS.length); // exactly the same count — no duplicates
   });
 });

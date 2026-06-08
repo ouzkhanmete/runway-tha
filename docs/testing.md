@@ -1,6 +1,6 @@
 # Testing
 
-All tests use Bun's native test runner (`bun test`). **89 tests** across a three-level pyramid.
+All tests use Bun's native test runner (`bun test`). **102 tests** across a three-level pyramid.
 
 ## Test layout
 
@@ -16,7 +16,7 @@ Colocated in `packages/core/src/**/*.test.ts`, `packages/shared/src/**/*.test.ts
 |---|---|
 | `infrastructure/api-clients/apple-rss.mapper.test.ts` | `mapEntry` and `mapFeedPage`: metadata-entry filtering, field mapping, single-object edge case |
 | `application/services/ingest-reviews.service.test.ts` | `IngestReviewsService`: port calls, success/error sync_run recording, rethrow on failure |
-| `application/services/review-query.service.test.ts` | `ReviewQueryService`: `since` date computation, delegation to `findRecent`, injectable clock |
+| `application/services/review-query.service.test.ts` | `ReviewQueryService`: `since` date computation, delegation to `findRecentPage` with limit + cursor, injectable clock |
 | `application/services/sync-scheduler.service.test.ts` | `SyncSchedulerService`: staleness + claim-TTL computation, per-app processing, lease release on success **and** failure, partial-failure isolation |
 | `apps/worker/src/scheduler-loop.test.ts` | `startLoop`: no overlapping ticks even when a tick outlasts the interval; `stop()` halts further ticks |
 | `packages/shared/src/dto/dto.test.ts` | All shared Zod schemas: valid parses, rejections, defaults, coercion |
@@ -31,7 +31,7 @@ Repository tests are colocated in `packages/core/src/infrastructure/repositories
 |---|---|
 | `test/int/harness.smoke.test.ts` | Migrations apply and `truncateAll` works |
 | `infrastructure/repositories/app.repository.test.ts` | `DrizzleAppRepository`: create (idempotent), findById, list, `claimDueForSync` (4 staleness cases + lease stamping, skip-already-claimed, reclaim-stuck-lease, **two concurrent claims never grab the same app**), `releaseClaim` |
-| `infrastructure/repositories/review.repository.test.ts` | `DrizzleReviewRepository`: upsertMany (insert, idempotent upsert, content update, empty array), `findRecent` (filter by window, ordering, type coercions) |
+| `infrastructure/repositories/review.repository.test.ts` | `DrizzleReviewRepository`: upsertMany (insert, idempotent upsert, content update, empty array), `findRecentPage` (window filter, newest-first ordering, type coercions, **multi-page cursor walk with no gaps/repeats, id tie-break determinism**) |
 | `infrastructure/api-clients/apple-rss.api-client.test.ts` | `AppleRssApiClient` with mocked `fetch`: URL construction, page aggregation, early-stop on empty page, retry on 429/403/5xx, throw after maxRetries |
 
 `apple-rss.api-client.test.ts` uses only a mocked `fetch` — no real network. The test DB is not required for it.
@@ -43,7 +43,7 @@ Located in `apps/api/test/e2e/`. Also require the test DB container.
 | File | What is tested |
 |---|---|
 | `apps.e2e.test.ts` | `POST /apps` (201, idempotent duplicate, 400 non-numeric, 400 bad JSON), `GET /apps` (empty, populated) |
-| `reviews.e2e.test.ts` | `GET /apps/:appId/reviews` (200 with window filter + newest-first ordering + schema validation, 400 invalid window, 404 unknown app, 200 empty) |
+| `reviews.e2e.test.ts` | `GET /apps/:appId/reviews` (200 page with window filter + newest-first ordering + schema validation, **cursor pagination across pages, explicit limit**, 400 invalid window, **400 malformed cursor**, 404 unknown app, 200 empty page) |
 | `full-flow.e2e.test.ts` | End-to-end flow: register app, confirm worker-style ingestion, query reviews |
 
 ### Client unit tests
@@ -52,7 +52,8 @@ Colocated in `apps/web/src/api/client.test.ts`.
 
 | File | What is tested |
 |---|---|
-| `client.test.ts` | `createApiClient`: `getReviews`/`getApps`/`registerApp` — valid parse, malformed-payload throw, ApiError message extraction, generic error message |
+| `client.test.ts` | `createApiClient`: `getReviews` (page parse, cursor forwarding)/`getApps`/`registerApp` — valid parse, malformed-payload throw, ApiError message extraction, generic error message |
+| `hooks/useQueryParam.test.ts` | `readParam`/`buildParamUrl` pure URL helpers + the hook's set-updates-value behavior |
 
 ## Running tests
 

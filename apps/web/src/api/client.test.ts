@@ -33,16 +33,35 @@ function makeFetch(status: number, body: unknown): typeof fetch {
 }
 
 describe("createApiClient - getReviews", () => {
-  test("parses valid ReviewDto[] response", async () => {
-    const client = createApiClient({ fetch: makeFetch(200, [sampleReview]) });
-    const reviews = await client.getReviews("app1", 48);
-    expect(reviews).toHaveLength(1);
-    expect(reviews[0].author).toBe("Jane Doe");
-    expect(reviews[0].rating).toBe(5);
+  test("parses a valid reviews page response", async () => {
+    const client = createApiClient({
+      fetch: makeFetch(200, { items: [sampleReview], nextCursor: "abc123" }),
+    });
+    const page = await client.getReviews("app1", 48);
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].author).toBe("Jane Doe");
+    expect(page.items[0].rating).toBe(5);
+    expect(page.nextCursor).toBe("abc123");
   });
 
-  test("throws on malformed payload (missing required field)", async () => {
-    const malformed = [{ id: "r1", appId: "app1" }]; // missing required fields
+  test("forwards the cursor as a query param", async () => {
+    let calledUrl = "";
+    const fetchSpy = (async (input: RequestInfo | URL) => {
+      calledUrl = String(input);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ items: [], nextCursor: null }),
+      } as Response;
+    }) as typeof fetch;
+    const client = createApiClient({ fetch: fetchSpy });
+    await client.getReviews("app1", 48, "CURSOR_TOKEN");
+    expect(calledUrl).toContain("cursor=CURSOR_TOKEN");
+    expect(calledUrl).toContain("windowHours=48");
+  });
+
+  test("throws on malformed payload (not a page shape)", async () => {
+    const malformed = [{ id: "r1", appId: "app1" }]; // an array, not { items, nextCursor }
     const client = createApiClient({ fetch: makeFetch(200, malformed) });
     await expect(client.getReviews("app1", 48)).rejects.toThrow();
   });

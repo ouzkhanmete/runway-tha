@@ -2,6 +2,7 @@ import type { AppRegistryService, ReviewQueryService } from "@packages/core/inde
 import { NotFoundError } from "@packages/core/index";
 import type { ReviewsQuerySchemaType } from "@packages/shared/index";
 import type { Context, Hono } from "hono";
+import { decodeCursor, encodeCursor } from "../cursor";
 import { toReviewDto } from "../mappers/review-dto.mapper";
 
 export interface ReviewsDeps {
@@ -27,14 +28,26 @@ export class ReviewsController {
 
   private async getRecent(c: Context) {
     const appId = c.req.param("appId");
-    const q = this.reviewsQuerySchema.parse({ windowHours: c.req.query("windowHours") });
+    const q = this.reviewsQuerySchema.parse({
+      windowHours: c.req.query("windowHours"),
+      limit: c.req.query("limit"),
+      cursor: c.req.query("cursor"),
+    });
 
     const app = await this.registry.get(appId);
     if (!app) {
       throw new NotFoundError(`App not found: ${appId}`);
     }
 
-    const reviews = await this.reviewQuery.getRecent(appId, q.windowHours);
-    return c.json(reviews.map(toReviewDto));
+    const cursor = q.cursor ? decodeCursor(q.cursor) : null;
+    const page = await this.reviewQuery.getRecentPage(appId, q.windowHours, {
+      limit: q.limit,
+      cursor,
+    });
+
+    return c.json({
+      items: page.items.map(toReviewDto),
+      nextCursor: page.nextCursor ? encodeCursor(page.nextCursor) : null,
+    });
   }
 }

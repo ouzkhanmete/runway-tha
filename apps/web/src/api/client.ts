@@ -2,8 +2,8 @@ import {
   ApiErrorSchema,
   type AppDto,
   AppDtoSchema,
-  type ReviewDto,
-  ReviewDtoSchema,
+  type ReviewsPageDto,
+  ReviewsPageDtoSchema,
 } from "@packages/shared/index";
 
 export function createApiClient(opts?: { fetch?: typeof fetch; baseUrl?: string }) {
@@ -32,10 +32,17 @@ export function createApiClient(opts?: { fetch?: typeof fetch; baseUrl?: string 
         }),
       ),
 
-    getReviews: async (appId: string, windowHours: number): Promise<ReviewDto[]> =>
-      ReviewDtoSchema.array().parse(
-        await req(`/api/apps/${appId}/reviews?windowHours=${windowHours}`),
-      ),
+    getReviews: async (
+      appId: string,
+      windowHours: number,
+      cursor?: string,
+    ): Promise<ReviewsPageDto> => {
+      const params = new URLSearchParams({ windowHours: String(windowHours) });
+      if (cursor) params.set("cursor", cursor);
+      return ReviewsPageDtoSchema.parse(
+        await req(`/api/apps/${appId}/reviews?${params.toString()}`),
+      );
+    },
   };
 }
 

@@ -33,7 +33,7 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 | `fetched_at` | `timestamptz` NOT NULL default `now()` | When the row was (last) upserted |
 
 **Indexes:**
-- `reviews (app_id, submitted_at DESC)` — covers the `WHERE app_id = ?` filter and `ORDER BY submitted_at DESC` ordering used by `findRecent`.
+- `reviews (app_id, submitted_at DESC, id DESC)` — serves the `WHERE app_id = ?` window filter, the `ORDER BY submitted_at DESC, id DESC` ordering, **and** the keyset cursor predicate `(submitted_at, id) < (?, ?)` used by `findRecentPage`, all as one indexed range scan. The trailing `id` makes the order total so the pagination cursor is stable (no skipped/repeated rows when timestamps tie).
 - `reviews.id` PRIMARY KEY — the unique index that the idempotent `ON CONFLICT (id) DO UPDATE` upsert relies on.
 
 ### `sync_runs` — audit log and staleness signal

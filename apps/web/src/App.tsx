@@ -23,10 +23,14 @@ export function App() {
   }, [apps, selectedAppId, setSelectedAppId]);
 
   const {
-    data: reviews,
+    data: reviewPages,
     isLoading: reviewsLoading,
     error: reviewsError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
   } = useReviews(selectedAppId, windowHours);
+  const reviews = reviewPages?.pages.flatMap((page) => page.items);
 
   return (
     <div>
@@ -57,6 +61,9 @@ export function App() {
         reviews={reviews}
         isLoading={reviewsLoading}
         error={reviewsError as Error | null}
+        hasNextPage={!!hasNextPage}
+        isFetchingNextPage={isFetchingNextPage}
+        onLoadMore={() => fetchNextPage()}
       />
     </div>
   );

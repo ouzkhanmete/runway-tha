@@ -40,17 +40,23 @@ Register an app to track. Create-only — calling it again with the same `appId`
 
 After registration the worker picks the new app up on its next tick — no manual trigger needed.
 
-### `GET /apps/:appId/reviews?windowHours=48`
+### `GET /apps/:appId/reviews?windowHours=48&limit=5&cursor=…`
+
+Cursor-paginated, newest-first (`submittedAt DESC, id DESC`).
 
 **Query parameters:**
 
 | Param | Default | Allowed values | Notes |
 |---|---|---|---|
 | `windowHours` | `48` (env `REVIEW_WINDOW_HOURS_DEFAULT`) | Any integer 1–8760 (up to 1 year) | Out-of-range or non-integer → 400 |
+| `limit` | `5` | Integer 1–50 | Page size |
+| `cursor` | — | Opaque token | The `nextCursor` from a previous page; malformed → 400 |
 
-Returns `ReviewDto[]` sorted newest-first (`submittedAt DESC`). Empty array if no reviews exist within the window.
+Returns a `ReviewsPageDto`: `{ items: ReviewDto[]; nextCursor: string | null }`. `nextCursor` is an opaque keyset token to fetch the next page; `null` means no more reviews in the window. To page through, keep calling with the previous response's `nextCursor` until it is `null`.
 
-**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours` is outside `[1, 8760]`.
+**Pagination is keyset (cursor), not offset.** The cursor encodes the `(submittedAt, id)` of the last item on the page, and the next query selects rows strictly after it — so each page is a bounded index range-scan with stable results even as new reviews arrive (no rows skipped or repeated, unlike `OFFSET`). The trailing `id` makes the ordering total so reviews sharing a `submittedAt` paginate deterministically.
+
+**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours`/`limit` are out of range or `cursor` is malformed.
 
 ## DTOs
 
@@ -84,6 +90,14 @@ All schemas live in `packages/shared/src/dto/` and are shared with the frontend.
   submittedAt: string;  // ISO 8601
 }
 ```
+
+### `ReviewsPageDto`
+
+```ts
+{ items: ReviewDto[]; nextCursor: string | null }
+```
+
+One page of reviews. `nextCursor` is an opaque token for the following page (`null` when exhausted).
 
 ### `RegisterAppRequest`
 

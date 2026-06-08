@@ -1,5 +1,5 @@
-import { act, renderHook } from "@testing-library/react";
 import { describe, expect, test } from "bun:test";
+import { act, renderHook } from "@testing-library/react";
 import { buildParamUrl, readParam, useQueryParam } from "./useQueryParam";
 
 // The URL logic lives in pure helpers so it is fully testable without a DOM —
