@@ -6,7 +6,9 @@ services:
       POSTGRES_PASSWORD: runway
       POSTGRES_DB: runway
     ports: ["5434:5432"]
-    volumes: ["runway_full_pg:/var/lib/postgresql"]
+    # Bind-mounted to a gitignored dir in the repo root so data survives restarts
+    # (and even `down -v`) and is visible on disk. Path is relative to this file (docker/).
+    volumes: ["../.data/postgres-full:/var/lib/postgresql"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U runway"]
       interval: 3s
@@ -65,6 +67,3 @@ services:
     ports: ["5173:5173"]
     depends_on:
       - api
-
-volumes:
-  runway_full_pg: {}

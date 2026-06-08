@@ -27,6 +27,11 @@ Thumbs.db
 # Test / coverage
 coverage/
 
+# Local persistent Postgres data — bind-mounted into the repo by docker compose
+# (dev + full stacks). Keep the directory, ignore its contents.
+/.data/*
+!/.data/.gitkeep
+
 # Superpowers working artifacts (design specs / plans) — not part of the deliverable
 docs/superpowers/
 

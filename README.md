@@ -78,7 +78,7 @@ docs/             subsystem deep-dives (see the documentation map below)
 
 A guided tour of the decisions a reviewer is most likely to care about. Each links to the doc with the full rationale.
 
-- **Idempotent, restart-safe ingestion.** Reviews are upserted with `ON CONFLICT (id) DO UPDATE` on Apple's stable review id. Re-fetching the same page produces the same rows — no duplicates, no cursor to persist — so a crashed or restarted worker simply re-runs and converges. ([`docs/data-model.md`](docs/data-model.md))
+- **Idempotent ingestion + durable storage = survives a restart.** Two halves: (1) reviews are upserted with `ON CONFLICT (id) DO UPDATE` on Apple's stable review id, so re-fetching produces the same rows — no duplicates, no cursor to persist — and a crashed or restarted worker just re-runs and converges; (2) Postgres is **bind-mounted to a gitignored `./.data/` directory in the repo**, so the data files live on disk and persist across `restart`, `down`+`up`, and even `down -v`. (Verified: ingest 500 reviews → `down -v` → `up` → still 500.) ([`docs/data-model.md`](docs/data-model.md) · [`docs/infra.md`](docs/infra.md#data-persistence))
 - **The worker is the only writer of `reviews`; the API only reads.** Onboarding is one `INSERT` into `apps`. Each tick the worker reads `apps ⨝ sync_runs` to find apps with no successful run inside the staleness window (default 15 min) and processes them — table-driven, so adding an app needs no config reload or restart. ([`docs/etl.md`](docs/etl.md))
 - **Multi-worker safety via an atomic claim lease.** Before processing, a worker claims its apps in a single statement — `UPDATE apps SET claimed_at = now() … FOR UPDATE SKIP LOCKED RETURNING …` — so two workers can never grab the same app. `SKIP LOCKED` handles the simultaneous race; the `claimed_at` timestamp handles the after-commit window and doubles as crash recovery (a lease older than `WORKER_CLAIM_TTL_MS` is reclaimable). The scheduler loop is a self-rescheduling `setTimeout`, so a slow tick delays the next one instead of overlapping it. ([`docs/etl.md`](docs/etl.md#multi-worker-safety-the-claim-lease))
 - **Keyset (cursor) pagination, not OFFSET.** Reviews page 5-at-a-time with an opaque cursor: `WHERE (submitted_at, id) < (?, ?) ORDER BY submitted_at DESC, id DESC LIMIT n`. Each page is a bounded index range-scan that stays stable as new reviews arrive (OFFSET would skip or repeat rows). The trailing `id` makes the sort total so the cursor is unambiguous when timestamps tie; the index `(app_id, submitted_at DESC, id DESC)` serves the filter, ordering, and cursor as one scan. ([`docs/decisions.md`](docs/decisions.md))
@@ -147,6 +147,7 @@ docker compose -f docker/docker-compose.full.yml up --build
 - Web UI: **http://localhost:5173** · API: **http://localhost:3001**
 - The `migrate` service runs (and applies all migrations) before the worker and API start.
 - The worker polls immediately — add an App Store ID via the form or `POST /apps` and it ingests within one tick.
+- **Data persists** in `./.data/postgres-full` (gitignored, bind-mounted) — stop and restart the stack (even `docker compose … down -v`) and your reviews are still there.
 
 ### Finding App Store IDs to test with
 

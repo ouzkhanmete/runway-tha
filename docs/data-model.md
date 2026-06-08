@@ -66,6 +66,8 @@ Inserting a row here is the complete act of onboarding an app. The worker self-d
 
 `apps` are inserted with `onConflictDoNothing`, making `POST /apps` also idempotent.
 
+Idempotency is the *correctness* half of "survives a restart" (R3); the *durability* half is the Postgres data itself, which the dev and full-stack compose files keep on disk via a bind mount to a gitignored `./.data/` directory (so it survives even `down -v`). See [`docs/infra.md`](infra.md#data-persistence).
+
 ## Country enum
 
 The `country` column stays `text` in the database. The repository maps it to/from the `Country` enum (`@packages/shared/enums/country`) which contains the full set of ISO 3166-1 alpha-2 codes as lowercase values (e.g. `Country.US = "us"`). This prevents magic strings in the application layer.
