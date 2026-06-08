@@ -9,7 +9,7 @@ Three tables. All timestamps are `timestamptz`. Schema lives in `packages/core/s
 | Column | Type | Notes |
 |---|---|---|
 | `id` | `text` PK | Numeric App Store ID (e.g. `595068606`) |
-| `name` | `text` nullable | App display name; starts null, backfilled by the worker from the iTunes Lookup API on first ingest (the reviews feed doesn't carry it) |
+| `name` | `text` nullable | App display name; set **at registration** from the iTunes Lookup API (the reviews feed doesn't carry it), never backfilled by the worker. Column stays nullable for schema simplicity, but a successfully registered app always has it. |
 | `country` | `text` NOT NULL default `us` | Two-letter ISO country code |
 | `created_at` | `timestamptz` NOT NULL default `now()` | Registration time |
 | `claimed_at` | `timestamptz` nullable | Worker claim lease — set while a worker is syncing this app, cleared on finish. See below. |

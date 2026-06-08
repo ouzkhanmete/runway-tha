@@ -39,7 +39,7 @@ A module-level singleton `apiClient = createApiClient()` is used by all hooks. T
 
 | Hook | Query key | Behaviour |
 |---|---|---|
-| `useApps()` | `["apps"]` | Fetches on mount; **polls every 5s while any app's `name` is still null** (just seeded/added, not yet enriched by the worker), then stops — so names appear automatically |
+| `useApps()` | `["apps"]` | Fetches on mount. Names are resolved at registration, so they're present immediately — no polling for names |
 | `useReviews(appId, windowHours)` | `["reviews", appId, windowHours]` | **`useInfiniteQuery`** — cursor pagination (5/page); `getNextPageParam` reads `nextCursor`; disabled until `appId` is defined |
 | `useRegisterApp()` | — (mutation) | On success, invalidates `["apps"]` to refresh the app list |
 
@@ -56,13 +56,13 @@ Root component. State:
 
 `useQueryParam` keeps the URL logic in pure helpers (`readParam`, `buildParamUrl`) that are unit-tested directly; the hook itself is thin glue over `window.history` + a `popstate` listener.
 
-Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`), the selected app's **name as an `<h2>` heading** (when the worker has resolved it; skipped while still null), and the `ReviewList`.
+Renders the control bar (`AddAppForm`, `AppSelector`, `WindowPicker`), the selected app's **name as an `<h2>` heading** (present from registration), and the `ReviewList`.
 
-The `AppSelector` dropdown labels each option `"{name} ({id})"` once the name is known, falling back to just the id until then (plus a "· syncing…" hint while the app is being fetched).
+The `AppSelector` dropdown labels each option `"{name} ({id})"` (the name is set at registration, so it's there immediately; a "· syncing…" hint is appended while a worker is fetching that app's reviews).
 
 ### `AddAppForm`
 
-Text input + submit button. Calls `useRegisterApp` with the trimmed input value. Clears the input on success and fires `onAdded(appId)`. Shows the error message inline on failure. The `pattern="\d+"` attribute provides browser-level hint for numeric-only input.
+Text input + submit button. Calls `useRegisterApp` with the trimmed input value. Clears the input on success and fires `onAdded(appId)`. On failure the form **turns red and shows the server's specific error message inline** — e.g. `"appId must be numeric"` for a bad id, or `"App not found in the App Store: …"` when the id is numeric but the app doesn't exist (the API resolves existence via the iTunes Lookup API at registration, returning `400 VALIDATION`). The `pattern="\d+"` attribute provides a browser-level hint for numeric-only input.
 
 On `onAdded`, `App.tsx` selects the new app and marks it `pendingAppId`. While pending, `useReviews` is given `pollUntilData` so it refetches every ~2.5s until the worker's next tick (≤10s) ingests the first reviews, and `ReviewList` shows a "Fetching the latest reviews…" loader instead of the empty state. The wait is cleared when reviews arrive or after a 30s ceiling.
 

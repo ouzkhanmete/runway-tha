@@ -64,12 +64,9 @@ Within each tick, `SyncSchedulerService.runDueOnce()`:
    - Calls `AppleRssApiClient.fetchAllPages` — always fetches pages 1–10 (stops early only if a page returns 0 entries).
    - Upserts all collected reviews (`reviewRepo.upsertMany`).
    - Closes the `sync_run` with `status: "success"` and counts, or `status: "error"` with the error message. The run record is always closed, even on failure.
-5. **Name backfill** — once per app (only while `apps.name` is null), the scheduler resolves the display name from the iTunes Lookup API and stores it. See [App name enrichment](#app-name-enrichment).
-6. After each app finishes (success **or** error), the scheduler calls `AppRepository.releaseClaim(app.id)` to clear the lease. A failed app increments `failed` but does not stop other apps from being processed.
+5. After each app finishes (success **or** error), the scheduler calls `AppRepository.releaseClaim(app.id)` to clear the lease. A failed app increments `failed` but does not stop other apps from being processed.
 
-### App name enrichment
-
-The customer-reviews RSS feed used for ingestion **does not carry the app name** (`feed.title` is the generic `"iTunes Store: Customer Reviews"`). So apps are registered with `name = null` (a single `POST /apps` or the seed inserts just the id), and the worker backfills the name from the **iTunes Lookup API** — `GET /lookup?id={appId}&country={country}` → `results[0].trackName` — via `ItunesLookupApiClient` (`AppMetadataClient` port). The scheduler does this once per app, only while the name is null, in the same tick that ingests its reviews. It is **best-effort**: any failure (network, non-2xx, no result) leaves the name null and never fails the tick, and `name` is re-attempted on the next time the app is due. This is why a freshly added app first shows its id in the UI, then its name a moment later.
+The worker does **no name resolution** — `apps.name` is already set at registration time (the reviews feed doesn't carry it). See [`docs/api.md`](api.md#post-apps) for how `register` resolves the name via the iTunes Lookup API and [`docs/decisions.md`](decisions.md#app-name-from-the-itunes-lookup-api-resolved-at-registration) for why.
 
 ### Multi-worker safety: the claim lease
 
@@ -106,10 +103,10 @@ The Apple feed provides only the ~500 most-recent reviews — there is no pagina
 
 The worker itself is a **pure reader** of the `apps` table; it never registers apps. Apps get into the table three ways, all of which the worker discovers on its next tick:
 
-- `POST /apps` (API) or the "Add app" form in the web UI — one row, id only.
-- The **seed step** in the full-stack compose — a one-shot `seed` container (`bun run --cwd packages/core seed`, source `packages/core/src/scripts/seed-top-apps.ts`) that fetches the current US top-free apps (`…/rss/topfreeapplications/limit=10/json`) and inserts their **ids only** (idempotent — already-tracked apps are skipped). It runs once after `migrate` and **before** the worker/api start, so the worker has work to do on first boot and the UI is pre-populated. If the feed is unreachable the seed exits 0 (never blocks startup); apps can still be added manually.
+- `POST /apps` (API) or the "Add app" form in the web UI — one row, name resolved at registration.
+- The **seed step** in the full-stack compose — a one-shot `seed` container (`bun run --cwd packages/core seed`, source `packages/core/src/scripts/seed-top-apps.ts`) that fetches the current US top-free apps (`…/rss/topfreeapplications/limit=10/json`) and onboards each id **through `register`** — the same path as a manual `POST /apps`, so each app is existence-checked and gets its name at seed time (idempotent — already-tracked apps are skipped). It runs once after `migrate` and **before** the worker/api start, so the worker has work to do on first boot and the UI is pre-populated. If the feed is unreachable the seed exits 0 (never blocks startup); apps can still be added manually.
 
-In every case only the id is stored; the worker fills the name on first ingest (see [App name enrichment](#app-name-enrichment)).
+In every case the app's name is resolved at registration (see [`docs/api.md`](api.md#post-apps)); the worker only ingests reviews.
 
 ## HTTP retry and backoff
 

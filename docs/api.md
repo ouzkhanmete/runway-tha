@@ -34,9 +34,14 @@ Register an app to track. Create-only — calling it again with the same `appId`
 | `appId` | `string` | Yes | Must match `/^\d+$/` (numeric) |
 | `country` | `string` | No | Two-character ISO code; defaults to `"us"` |
 
-**Response:** `AppDto` with HTTP `201`.
+**Existence + name resolution:** `AppRegistryService.register` calls the **iTunes Lookup API** (`GET /lookup?id={appId}&country={country}` → `{ resultCount, results: [{ trackName }] }`) once during registration. If `resultCount === 0` the app does not exist in the App Store and registration is rejected (see Errors). Otherwise the app is inserted **with its name already populated** (`AppDto.name` is non-null from the first response).
 
-**Errors:** `400 VALIDATION` if `appId` is non-numeric or body is unparseable JSON.
+**Response:** `AppDto` (with `name` set) and HTTP `201`.
+
+**Errors:**
+
+- `400 VALIDATION` if `appId` is non-numeric or the body is unparseable JSON. The message is the **specific** first Zod issue (e.g. `"appId must be numeric"`), not a generic "Invalid request".
+- `400 VALIDATION` if `appId` is numeric but **the app doesn't exist** in the App Store (lookup `resultCount === 0`) — message `"App not found in the App Store: {appId}"`.
 
 After registration the worker picks the new app up on its next tick — no manual trigger needed.
 
@@ -73,6 +78,8 @@ All schemas live in `packages/shared/src/dto/` and are shared with the frontend.
   claimedAt: string | null;  // ISO timestamp while a worker is currently syncing this app, else null
 }
 ```
+
+`name` is set at registration from the iTunes Lookup API (`POST /apps` resolves it synchronously), so it is non-null for any app that registered successfully.
 
 `claimedAt` mirrors the worker's claim lease (`apps.claimed_at`) — non-null means a worker is processing this app right now. It is informational only (the web app selector shows a "syncing…" hint); see [`docs/etl.md`](etl.md#multi-worker-safety-the-claim-lease).
 
@@ -122,8 +129,11 @@ All error responses use a consistent JSON structure:
 | Scenario | HTTP Status | Code |
 |---|---|---|
 | Zod parse failure (request body or query params) | `400` | `VALIDATION` |
-| App not found | `404` | `NOT_FOUND` |
+| `POST /apps` with a numeric but nonexistent App Store id (lookup `resultCount === 0`) | `400` | `VALIDATION` |
+| App not found (reading reviews for an unregistered app) | `404` | `NOT_FOUND` |
 | Unexpected error | `500` | `INTERNAL` |
+
+On a Zod parse failure the `message` is the **first issue's message** (specific, e.g. `"appId must be numeric"`) rather than a generic string; the full issue array is still attached as `details`.
 
 Error handling is centralised in `apps/api/src/middleware/error.ts` via Hono's `app.onError`.
 
