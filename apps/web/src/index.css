@@ -36,6 +36,15 @@ body {
   font-size: 15px;
 }
 
+/* Selected app name shown above the review list */
+.app-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin-top: 8px;
+  margin-bottom: 20px;
+}
+
 /* Controls bar */
 .controls-bar {
   display: flex;
