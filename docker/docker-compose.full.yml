@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: runway
+      POSTGRES_PASSWORD: runway
+      POSTGRES_DB: runway
+    ports: ["5434:5432"]
+    volumes: ["runway_full_pg:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runway"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: bun run --cwd packages/core migrate
+    environment:
+      DATABASE_URL: postgres://runway:runway@postgres:5432/runway
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: bun run --cwd apps/worker start
+    environment:
+      DATABASE_URL: postgres://runway:runway@postgres:5432/runway
+      FEED_BASE_URL: https://itunes.apple.com
+      SEED_APP_IDS: "595068606"
+      WORKER_TICK_MS: "60000"
+      WORKER_STALENESS_MIN: "15"
+      WORKER_MAX_PAGES: "10"
+      WORKER_CONCURRENCY: "3"
+      WORKER_MAX_RETRIES: "3"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: bun run --cwd apps/api start
+    environment:
+      DATABASE_URL: postgres://runway:runway@postgres:5432/runway
+      APP_PORT: "3000"
+      REVIEW_WINDOW_HOURS_DEFAULT: "48"
+      REVIEW_WINDOW_HOURS_ALLOWED: "48,168,720"
+    ports: ["3001:3000"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    environment:
+      API_PROXY_TARGET: http://api:3000
+    ports: ["5173:5173"]
+    depends_on:
+      - api
+
+volumes:
+  runway_full_pg: {}
