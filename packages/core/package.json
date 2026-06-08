@@ -7,7 +7,8 @@
   },
   "scripts": {
     "generate": "drizzle-kit generate",
-    "migrate": "bun run src/infrastructure/db/migrate.ts"
+    "migrate": "bun run src/infrastructure/db/migrate.ts",
+    "seed": "bun run src/scripts/seed-top-apps.ts"
   },
   "dependencies": {
     "@runway/shared": "workspace:*",

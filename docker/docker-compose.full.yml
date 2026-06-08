@@ -26,6 +26,21 @@ services:
       postgres:
         condition: service_healthy
 
+  # Seeds the current US top-free app ids (id only — the worker fills each name) so
+  # the UI is pre-populated. Runs once after migrate and must finish before the
+  # worker/api start. Idempotent: already-tracked apps are skipped.
+  seed:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    command: bun run --cwd packages/core seed
+    environment:
+      DATABASE_URL: postgres://runway:runway@postgres:5432/runway
+      FEED_BASE_URL: https://itunes.apple.com
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   worker:
     build:
       context: ..
@@ -41,7 +56,7 @@ services:
       WORKER_CONCURRENCY: "3"
       WORKER_MAX_RETRIES: "3"
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
 
   api:
@@ -55,7 +70,7 @@ services:
       REVIEW_WINDOW_HOURS_DEFAULT: "48"
     ports: ["3001:3000"]
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
 
   web:
