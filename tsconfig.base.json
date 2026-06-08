@@ -11,8 +11,11 @@
     "types": ["bun"],
     "baseUrl": ".",
     "paths": {
-      "@runway/shared": ["packages/shared/src/index.ts"],
-      "@runway/core": ["packages/core/src/index.ts"]
+      "@packages/shared/*": ["packages/shared/src/*"],
+      "@packages/core/*": ["packages/core/src/*"],
+      "@apps/api/*": ["apps/api/src/*"],
+      "@apps/worker/*": ["apps/worker/src/*"],
+      "@apps/web/*": ["apps/web/src/*"]
     }
   }
 }

@@ -1,0 +1,5 @@
+{
+  "//": "Build view: excludes colocated tests so a `tsc` emit build would not include them. Type-checking (per-package tsconfig.json) still includes tests.",
+  "extends": "./tsconfig.base.json",
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts", "**/test/**"]
+}

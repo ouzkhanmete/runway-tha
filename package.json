@@ -2,13 +2,18 @@
   "name": "runway-tha",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "db:up": "docker compose -f docker/docker-compose.yml up -d",
     "db:down": "docker compose -f docker/docker-compose.yml down",
     "db:test:up": "docker compose -f docker/docker-compose.test.yml up -d",
     "db:test:down": "docker compose -f docker/docker-compose.test.yml down",
     "test": "bun test",
+    "format": "biome check --write .",
+    "format:check": "biome check .",
     "generate": "bun run --cwd packages/core generate",
     "migrate": "bun run packages/core/src/infrastructure/db/migrate.ts",
     "dev:api": "bun run --cwd apps/api dev",
@@ -16,6 +21,7 @@
     "dev:web": "bun run --cwd apps/web dev"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
     "@types/bun": "^1.3.14",
     "drizzle-kit": "^0.31.10",
     "typescript": "^6.0.3"
