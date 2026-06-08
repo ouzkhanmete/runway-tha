@@ -2,6 +2,9 @@ const WINDOWS = [
   { label: "48h", hours: 48 },
   { label: "7d", hours: 168 },
   { label: "30d", hours: 720 },
+  { label: "60d", hours: 1440 },
+  { label: "90d", hours: 2160 },
+  { label: "1y", hours: 8760 },
 ] as const;
 
 interface WindowPickerProps {

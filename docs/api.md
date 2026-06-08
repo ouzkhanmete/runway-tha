@@ -46,11 +46,11 @@ After registration the worker picks the new app up on its next tick — no manua
 
 | Param | Default | Allowed values | Notes |
 |---|---|---|---|
-| `windowHours` | `48` (env `REVIEW_WINDOW_HOURS_DEFAULT`) | Any integer 1–720 | Out-of-range or non-integer → 400 |
+| `windowHours` | `48` (env `REVIEW_WINDOW_HOURS_DEFAULT`) | Any integer 1–8760 (up to 1 year) | Out-of-range or non-integer → 400 |
 
 Returns `ReviewDto[]` sorted newest-first (`submittedAt DESC`). Empty array if no reviews exist within the window.
 
-**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours` is outside `[1, 720]`.
+**Errors:** `404 NOT_FOUND` if the app is not registered; `400 VALIDATION` if `windowHours` is outside `[1, 8760]`.
 
 ## DTOs
 
@@ -115,8 +115,8 @@ Error handling is centralised in `apps/api/src/middleware/error.ts` via Hono's `
 
 ## Window hours validation
 
-`windowHours` is validated as any integer in **[1, 720]**. The default is `48` (configurable via `REVIEW_WINDOW_HOURS_DEFAULT`). The API composition root builds the validation schema via `makeReviewsQuerySchema(env.REVIEW_WINDOW_HOURS_DEFAULT)` from `@packages/shared`. Values outside the range return `400 VALIDATION`.
+`windowHours` is validated as any integer in **[1, 8760]** (up to 1 year). The default is `48` (configurable via `REVIEW_WINDOW_HOURS_DEFAULT`). The API composition root builds the validation schema via `makeReviewsQuerySchema(env.REVIEW_WINDOW_HOURS_DEFAULT)` from `@packages/shared`. Values outside the range return `400 VALIDATION`.
 
-The frontend's `WindowPicker` offers **48h / 7d / 30d** as convenience presets (a local FE constant), but the API accepts any integer in range. The default `windowHours=48` returns an empty list for apps whose newest review is older than two days — use `168` or `720` for those.
+The frontend's `WindowPicker` offers **48h / 7d / 30d / 60d / 90d / 1y** as convenience presets (a local FE constant), but the API accepts any integer in range. The default `windowHours=48` returns an empty list for apps whose newest review is older than two days — use a wider window for those. (Apple's feed only spans the ~500 most-recent reviews, so very wide windows surface whatever history the DB has accumulated over time rather than fetching further back.)
 
 See [`docs/architecture.md`](architecture.md) for the composition root and [`docs/frontend.md`](frontend.md) for the matching client-side types.

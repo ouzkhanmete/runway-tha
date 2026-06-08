@@ -20,7 +20,7 @@ Key design decisions and dependency justifications.
 
 ### Configurable review window (default 48h)
 
-The API and frontend default to a 48h window because the primary use-case is monitoring recent reviews. A narrow default prevents unbounded query results on apps with large review history. The window is any integer in **[1, 720]** hours, so users can look back as far as needed (up to the 30-day / 500-review limit of the Apple RSS feed). The frontend's `WindowPicker` offers **48h / 7d / 30d** as convenience presets, but the API accepts any value in range.
+The API and frontend default to a 48h window because the primary use-case is monitoring recent reviews. A narrow default prevents unbounded query results on apps with large review history. The window is any integer in **[1, 8760]** hours (up to 1 year), so users can look back as far as the DB has accumulated. The frontend's `WindowPicker` offers **48h / 7d / 30d / 60d / 90d / 1y** as convenience presets, but the API accepts any value in range. (Apple's RSS feed itself only spans the ~500 most-recent reviews, so windows wider than the feed's reach surface accumulated history rather than fetching further back.)
 
 Apple's RSS feed only provides the ~500 most-recent reviews, so the local DB will not contain older reviews unless they happen to fall within a fetch window — which is why 48h may return zero results for apps with low velocity and is entirely expected.
 

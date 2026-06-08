@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-/** Review window bounds in hours. Default 48h; max 720h (the feed only spans the ~500 most recent reviews). */
+/** Review window bounds in hours. Default 48h; max 8760h (1 year) of accumulated history. */
 export const MIN_WINDOW_HOURS = 1;
-export const MAX_WINDOW_HOURS = 720;
+export const MAX_WINDOW_HOURS = 8760; // 365 days
 export const DEFAULT_WINDOW_HOURS = 48;
 
 /**
  * Build the `windowHours` query schema. `windowHours` is an integer in
- * [1, 720]; when omitted it defaults to `defaultHours` (48 → the last 48 hours).
+ * [1, 8760]; when omitted it defaults to `defaultHours` (48 → the last 48 hours).
  * The API composition root builds this from `REVIEW_WINDOW_HOURS_DEFAULT`.
  */
 export function makeReviewsQuerySchema(defaultHours: number = DEFAULT_WINDOW_HOURS) {

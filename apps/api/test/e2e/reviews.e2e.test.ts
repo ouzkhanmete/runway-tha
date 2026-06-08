@@ -115,7 +115,7 @@ describe("GET /apps/:appId/reviews", () => {
   test("400 when windowHours is unsupported value", async () => {
     await seedApp();
 
-    const res = await app.request(`/apps/${APP_ID}/reviews?windowHours=999`);
+    const res = await app.request(`/apps/${APP_ID}/reviews?windowHours=99999`);
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error.code).toBe("VALIDATION");

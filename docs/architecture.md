@@ -60,7 +60,7 @@ Used by all three apps and safe to import in the browser.
 | `ReviewDtoSchema`, `ReviewDto` | Zod schema + inferred type for a review response |
 | `AppDtoSchema`, `AppDto` | Schema + type for an app response |
 | `RegisterAppRequestSchema` | POST /apps request validation |
-| `makeReviewsQuerySchema`, `ReviewsQuerySchema` | Query-param validation (any int 1–720, default 48) |
+| `makeReviewsQuerySchema`, `ReviewsQuerySchema` | Query-param validation (any int 1–8760, default 48) |
 | `Country` | Full ISO 3166-1 alpha-2 enum (lowercase values) for storefront selection |
 | `ApiErrorSchema`, `ApiError` | Error envelope schema |
 

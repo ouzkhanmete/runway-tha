@@ -52,15 +52,16 @@ test("ReviewsQuerySchema defaults windowHours to 48", () => {
   expect(ReviewsQuerySchema.parse({}).windowHours).toBe(48);
 });
 
-test("ReviewsQuerySchema accepts any integer in [1, 720]", () => {
+test("ReviewsQuerySchema accepts any integer in [1, 8760]", () => {
   expect(ReviewsQuerySchema.parse({ windowHours: "72" }).windowHours).toBe(72);
   expect(ReviewsQuerySchema.parse({ windowHours: 1 }).windowHours).toBe(1);
   expect(ReviewsQuerySchema.parse({ windowHours: 720 }).windowHours).toBe(720);
+  expect(ReviewsQuerySchema.parse({ windowHours: 8760 }).windowHours).toBe(8760);
 });
 
 test("ReviewsQuerySchema rejects out-of-range windowHours", () => {
   expect(() => ReviewsQuerySchema.parse({ windowHours: 0 })).toThrow();
-  expect(() => ReviewsQuerySchema.parse({ windowHours: 721 })).toThrow();
+  expect(() => ReviewsQuerySchema.parse({ windowHours: 8761 })).toThrow();
 });
 
 test("makeReviewsQuerySchema honors a custom default", () => {

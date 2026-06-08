@@ -60,7 +60,7 @@ Text input + submit button. Calls `useRegisterApp` with the trimmed input value.
 
 ### `WindowPicker`
 
-Three toggle buttons: **48h** (48 hours), **7d** (168 hours), **30d** (720 hours). These are convenience presets defined as a local FE constant; the API accepts any integer in [1, 720]. Selecting a different window triggers a new query via the `windowHours` key change in `useReviews`.
+Six toggle buttons: **48h** (48), **7d** (168), **30d** (720), **60d** (1440), **90d** (2160), **1y** (8760 hours). These are convenience presets defined as a local FE constant; the API accepts any integer in [1, 8760]. Selecting a different window triggers a new query via the `windowHours` key change in `useReviews`.
 
 ### `ReviewCard`
 
