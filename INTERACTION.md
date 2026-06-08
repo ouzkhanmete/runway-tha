@@ -60,3 +60,22 @@ This file documents how the project was built with **Claude Code**. Each entry i
 - **`apps/web` (Agent FE):** Vite + React + TanStack Query shell with a `/api` dev proxy; typed **API client** (Zod-parses responses); query **hooks**; **components** (rating stars, review card with relative+absolute time, list with loading/empty/error states, app selector, add-app form, window picker). 15 tests (happy-dom).
 - **Orchestrator review caught a real defect:** BE had named the concrete repository classes identically to the port interfaces (ambiguous `@runway/core` re-exports) — sent the agent back to rename them to `Drizzle*Repository`. Also shed unused `React` imports in the FE.
 - Verified end-to-end: **64/64 tests green**, core + web type-checks clean. Committed in 7 conventional commits.
+
+---
+
+## Turn 4 — Execute: Wave 2 (worker + API) & Wave 3 (integration, docs, review) (2026-06-08)
+
+**Prompt:** (continuation of the execution loop)
+
+**Wave 2 — `apps/worker` + `apps/api` (Agent BE):** bounded-concurrency `SyncSchedulerService`; the **table-driven worker** (tick + staleness, seeds `SEED_APP_IDS`, graceful shutdown); the **Hono API** (`/health`, `GET/POST /apps`, `GET /apps/:id/reviews`) with DTO mappers + a central error envelope; API e2e against the real test DB. A real-feed smoke ingested **500 live reviews**. Then verified the whole backend live: `48h → 0` reviews (newest is ~6 days old — validates the configurable window), `720h → 6`, newest-first with all required fields, bad window → 400, unknown app → 404.
+
+**Wave 3 — integration + docs (Agents INFRA ∥ DOCS):** full `docker-compose.full.yml` + Dockerfiles (postgres + migrate + worker + api + web) — **verified serving reviews end-to-end through the web→api proxy**; a worker→DB→API **cross-seam e2e**; the complete `docs/` set + CLAUDE.md doc-map + README quick-start.
+
+**Final review (most-capable model) + fixes:** a holistic review found **no blockers** (all 6 requirements met, clean architecture confirmed) and flagged quality items I then fixed:
+- Push the 48h window filter into SQL (was filtering in memory) so the recent-index is actually used.
+- Make the window allow-list **genuinely env-configurable** (`REVIEW_WINDOW_HOURS_*` now drive a schema built at the API composition root — proven live: a custom `48,72` set accepts 72 and rejects 168) and corrected the doc that had claimed this.
+- `await` app seeding before the first worker tick (was a first-boot race).
+- Type the RSS mapper with `FeedEntry` + guard malformed entries.
+- Fix `bun run migrate` to resolve `DATABASE_URL` via the env loader (was undefined under `--cwd`).
+
+**Result:** **81/81 tests green**, all five packages type-check clean, API verified **20/20 reliable** against a live DB, full docker stack verified. Committed across Waves 2–3 + 5 fix commits.
